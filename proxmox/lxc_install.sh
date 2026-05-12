@@ -16,7 +16,6 @@ export var_unprivileged="1"
 export NSAPP="media-curator"
 
 # --- Source Community Functions ---
-# We source the library to get access to whiptail menus, storage selection, and UI helpers
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
 
 function header_info() {
@@ -57,19 +56,24 @@ function install_script() {
     fi
     
     # 2. Storage Selection
-    # We use a temporary file for the library's storage selection logic
-    VARS_FILE="/tmp/media-curator.vars"
-    touch "$VARS_FILE"
+    msg_info "Selecting Storage"
+    # We use the internal select_storage and provide fallbacks to ensure variables are set
+    if ! select_storage "container"; then
+        STORAGE_RESULT=$(pvesm status -content rootdir | awk 'NR>1{print $1; exit}')
+    fi
+    CONTAINER_STORAGE="${STORAGE_RESULT:-local-lvm}"
     
-    # We remove msg_info here as it breaks the following whiptail dialogs
-    choose_and_set_storage_for_file "$VARS_FILE" "container"
-    CONTAINER_STORAGE=$STORAGE_RESULT
-    
-    choose_and_set_storage_for_file "$VARS_FILE" "template"
-    TEMPLATE_STORAGE=$STORAGE_RESULT
+    if ! select_storage "template"; then
+        STORAGE_RESULT=$(pvesm status -content vztmpl | awk 'NR>1{print $1; exit}')
+    fi
+    TEMPLATE_STORAGE="${STORAGE_RESULT:-local}"
+    msg_ok "Using ${CONTAINER_STORAGE} for disk and ${TEMPLATE_STORAGE} for templates"
 
     # 3. Create LXC Container
     msg_info "Creating LXC Container"
+    
+    # Ensure CTID is set (exported for post-install)
+    CTID=${CT_ID:-$(pvesh get /cluster/nextid)}
     
     # Get template
     pveam update >/dev/null
@@ -77,27 +81,27 @@ function install_script() {
     pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null || true
 
     # Create Container
-    # Note: $PW already includes the '--password' flag if a password was set.
-    pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
-        --hostname "$HN" \
+    # Using the most robust storage:size syntax
+    pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
+        --hostname "${HN:-$NSAPP}" \
         $PW \
-        --rootfs "volume=${CONTAINER_STORAGE},size=${DISK_SIZE}G" \
-        --memory "$RAM_SIZE" \
-        --cores "$CORE_COUNT" \
+        --rootfs "${CONTAINER_STORAGE}:${DISK_SIZE:-8}" \
+        --memory "${RAM_SIZE:-1024}" \
+        --cores "${CORE_COUNT:-1}" \
         --net0 "name=eth0,bridge=${BRG:-vmbr0},ip=${NET:-dhcp}${GATE:-}" \
         --onboot 1 \
-        --unprivileged "$CT_TYPE" \
+        --unprivileged "${CT_TYPE:-1}" \
         --features "nesting=1"
 
-    pct start "$CT_ID"
-    msg_ok "Created LXC Container ${CT_ID}"
+    pct start "$CTID"
+    msg_ok "Created LXC Container ${CTID}"
 
     msg_info "Running Application Setup"
     # Run app_setup.sh inside the container
     if command -v gh &> /dev/null; then
-        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | pct exec "$CT_ID" -- bash
+        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | pct exec "$CTID" -- bash
     else
-        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CT_ID" -- bash
+        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CTID" -- bash
     fi
     
     description
@@ -106,7 +110,6 @@ function install_script() {
 # --- Execution Flow ---
 
 # 1. Basic initialization
-# Note: We do NOT call header_info here as it breaks the whiptail UI initialization in start
 variables
 color
 catch_errors
