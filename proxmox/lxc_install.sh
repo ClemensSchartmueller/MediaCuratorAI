@@ -77,9 +77,10 @@ function install_script() {
     pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null || true
 
     # Create Container
+    # Note: $PW already includes the '--password' flag if a password was set.
     pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
         --hostname "$HN" \
-        --password "$PASSWORD" \
+        $PW \
         --rootfs "volume=${CONTAINER_STORAGE},size=${DISK_SIZE}G" \
         --memory "$RAM_SIZE" \
         --cores "$CORE_COUNT" \
