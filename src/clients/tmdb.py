@@ -4,12 +4,25 @@ from datetime import datetime, timedelta
 class TMDBClient(BaseClient):
     def __init__(self, api_key):
         super().__init__("https://api.themoviedb.org/3", api_key)
+        self.is_bearer = api_key.startswith("eyJ")
 
     def _get(self, endpoint, params=None, headers=None):
+        if not headers:
+            headers = {}
         if not params:
             params = {}
-        params["api_key"] = self.api_key
-        return super()._get(endpoint, params=params, headers=headers)
+            
+        if self.is_bearer:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        else:
+            params["api_key"] = self.api_key
+            
+        # TMDB doesn't use X-Api-Key, so we avoid BaseClient adding it
+        # by calling requests directly or passing custom headers to super
+        url = f"{self.base_url}{endpoint}"
+        response = self.session.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        return response.json()
 
     def discover_new_releases(self):
         # Movies released to digital/VOD in last 30 days
