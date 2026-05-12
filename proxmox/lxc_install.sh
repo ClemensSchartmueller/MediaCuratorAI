@@ -44,9 +44,9 @@ function lxc_provision() {
 
   # Run app_setup.sh inside the container
   if [[ -n "$GH_TOKEN_VAL" ]]; then
-      (echo "export GH_TOKEN=\"$GH_TOKEN_VAL\""; gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh) | pct exec "$CTID" -- bash
+      (echo "export GH_TOKEN=\"$GH_TOKEN_VAL\""; gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh) | pct exec "$CTID" -- bash -s
   else
-      curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CTID" -- bash
+      curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CTID" -- bash -s
   fi
   
   msg_ok "Completed Application Setup"
