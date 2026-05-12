@@ -2,7 +2,7 @@ import unittest
 import re
 from pathlib import Path
 
-EXPECTED_SETUP_INVOCATIONS = 2
+EXPECTED_SETUP_INVOCATION_COUNT_BOTH_PATHS = 2
 
 
 class TestProxmoxInstaller(unittest.TestCase):
@@ -16,7 +16,10 @@ class TestProxmoxInstaller(unittest.TestCase):
             r'pct\s+exec\s+["\']?\$CTID["\']?\s+--\s+bash\s+-s', script
         )
 
-        self.assertEqual(len(matches), EXPECTED_SETUP_INVOCATIONS)
+        self.assertEqual(
+            len(matches),
+            EXPECTED_SETUP_INVOCATION_COUNT_BOTH_PATHS,
+        )
 
 
 if __name__ == "__main__":
