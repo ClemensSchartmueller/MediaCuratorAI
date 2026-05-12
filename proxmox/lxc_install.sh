@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 
-# Media Curator Proxmox LXC Installer
+# Media Curator Proxmox LXC Installer & Updater
 # Powered by ProxmoxVE Community Scripts
 
 set -eo pipefail
 
 # --- App Specific Variables ---
-# These are used by build.func to configure the container
 export APP="Media-Curator"
 export var_os="debian"
 export var_version="12"
@@ -14,14 +13,10 @@ export var_cpu="1"
 export var_ram="1024"
 export var_disk="8"
 export var_unprivileged="1"
-# We define a custom setup function that will be called after container creation
 export NSAPP="media-curator"
 
 # --- Source Community Functions ---
-# This library handles storage selection, template downloads, and pct create logic
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
-
-# --- Overrides and Custom Logic ---
 
 function header_info() {
 cat <<EOF
@@ -35,37 +30,34 @@ cat <<EOF
 EOF
 }
 
-# The build_container function in build.func will call this if it exists
-# to perform app-specific installation inside the container.
+# This function runs when the script is executed INSIDE the LXC
 function update_script() {
     header_info
-    echo -e "${GN}Running Application Setup...${CL}"
+    if [[ ! -d /opt/media-curator ]]; then
+        msg_error "No ${APP} Installation Found!"
+        exit 1
+    fi
     
-    # We download the app_setup.sh from the repository and run it
-    # This ensures the latest version is used even if the local host script is older.
+    msg_info "Updating ${APP}"
+    # Fetch and run the app setup script which handles the actual logic (git pull, pip install, etc)
     curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/master/proxmox/app_setup.sh | bash
+    msg_ok "Updated ${APP}"
 }
 
-# --- Execution ---
+# --- Execution Flow ---
 
-# 1. Initialize environment
+# If we are NOT running in an LXC, we are on the Proxmox Host -> Install Mode
+if [[ ! -d /etc/pve ]]; then
+    # We are inside the container (or at least not on the host)
+    update_script
+    exit
+fi
+
+# We are on the host -> Run installation logic
 header_info
 variables
 color
 catch_errors
-
-# 2. Trigger standardized build process
-# This handles:
-# - Validating Proxmox host
-# - Advanced vs Default settings prompt
-# - Storage selection (fixes the "no such logical volume" issues)
-# - Template download
-# - pct create
-# - Starting container
 start
-
-# 3. Build and Configure
 build_container
-
-# 4. Final Description
 description
