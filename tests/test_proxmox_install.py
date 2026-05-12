@@ -2,6 +2,8 @@ import unittest
 import re
 from pathlib import Path
 
+EXPECTED_SETUP_INVOCATIONS = 2
+
 
 class TestProxmoxInstaller(unittest.TestCase):
     def test_lxc_provision_executes_setup_script_from_stdin(self):
@@ -12,7 +14,7 @@ class TestProxmoxInstaller(unittest.TestCase):
 
         matches = re.findall(r'pct\s+exec\s+"\$CTID"\s+--\s+bash\s+-s', script)
 
-        self.assertEqual(len(matches), 2)
+        self.assertEqual(len(matches), EXPECTED_SETUP_INVOCATIONS)
 
 
 if __name__ == "__main__":
