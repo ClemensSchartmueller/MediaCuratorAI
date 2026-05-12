@@ -23,6 +23,22 @@ class TestLLMUtils(unittest.TestCase):
         expected = '{"key": "value"}'
         self.assertEqual(extract_json_from_response(text), expected)
 
+    def test_extract_json_ignores_inline_fence_mention(self):
+        text = (
+            'I used ```json``` as an example format.\n'
+            'Actual output:\n```json\n{"key": "value"}\n```'
+        )
+        expected = '{"key": "value"}'
+        self.assertEqual(extract_json_from_response(text), expected)
+
+    def test_extract_json_prefers_json_block_among_multiple_blocks(self):
+        text = (
+            "First block:\n```\nnot json\n```\n"
+            'Then JSON:\n```json\n{"key": "value"}\n```'
+        )
+        expected = '{"key": "value"}'
+        self.assertEqual(extract_json_from_response(text), expected)
+
 
 if __name__ == "__main__":
     unittest.main()
