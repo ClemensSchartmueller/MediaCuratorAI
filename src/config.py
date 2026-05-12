@@ -22,4 +22,10 @@ class Config:
     SIGNAL_NUMBER = os.getenv("SIGNAL_NUMBER")
     SIGNAL_RECIPIENT = os.getenv("SIGNAL_RECIPIENT")
 
+    RADARR_ROOT_FOLDER = os.getenv("RADARR_ROOT_FOLDER", "/data/media/movies")
+    RADARR_QUALITY_PROFILE = int(os.getenv("RADARR_QUALITY_PROFILE", "1"))
+
+    SONARR_ROOT_FOLDER = os.getenv("SONARR_ROOT_FOLDER", "/data/media/tv")
+    SONARR_QUALITY_PROFILE = int(os.getenv("SONARR_QUALITY_PROFILE", "1"))
+
     DB_PATH = "media_curator.db"

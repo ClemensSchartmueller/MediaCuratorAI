@@ -44,7 +44,7 @@ class DiscoveryPipeline:
         # 1. Get Taste Profile
         profile = self.db.get_taste_profile()
         if not profile:
-            return "Taste profile missing. Run Profiler first."
+            raise ValueError("Taste profile missing. Run Profiler first.")
 
         # 2. Get Existing Media
         existing_ids = self._get_existing_tmdb_ids()
@@ -69,9 +69,21 @@ class DiscoveryPipeline:
         # 6. Curate via Gemini
         raw_curation = self.gemini.curate_recommendations(profile, candidates_text)
         
-        # 7. Parse and Save (Simplified parsing for now)
-        # In a real scenario, we'd use a stricter structured output or regex
-        # For Phase 2, we'll store the raw text and do a manual-ish mapping 
-        # but let's try to extract IDs if possible.
-        
-        return raw_curation
+        # 7. Parse and return
+        # Clean up JSON if LLM added backticks
+        json_str = raw_curation
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0].strip()
+            
+        try:
+            data = json.loads(json_str)
+            recommendations = data.get('recommendations', [])
+            for i, rec in enumerate(recommendations):
+                rec['position'] = i + 1
+            return recommendations, raw_curation
+        except Exception as e:
+            print(f"Error parsing Gemini curation: {e}")
+            # Fallback or re-raise
+            raise

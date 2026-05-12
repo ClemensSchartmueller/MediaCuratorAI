@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/media_curator
+WorkingDirectory=/opt/media-curator
 ExecStart=/usr/bin/python3 main.py listen
 Restart=always
 RestartSec=10

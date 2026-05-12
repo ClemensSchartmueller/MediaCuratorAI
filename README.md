@@ -32,17 +32,21 @@ AI-driven media recommendation daemon for self-hosted stacks.
 
 5. **Deployment (LXC):**
    - Copy `deployment/media-curator.service` to `/etc/systemd/system/`.
+   - Copy `deployment/media-curator-discovery.service` and `deployment/media-curator-discovery.timer` to `/etc/systemd/system/`.
+   - `systemctl daemon-reload`
    - `systemctl enable --now media-curator.service`
+   - `systemctl enable --now media-curator-discovery.timer`
 
-6. **Scheduling:**
-   Add the following to your crontab (`crontab -e`):
-   ```cron
-   # Weekly discovery (Sundays at 10 AM)
-   0 10 * * 0 cd /opt/media_curator && ./venv/bin/python main.py discover
+## Scheduling
+You can use the provided systemd timer (recommended for LXC) or traditional cron.
+If using cron:
+```cron
+# Weekly discovery (Sundays at 10 AM)
+0 10 * * 0 cd /opt/media_curator && ./venv/bin/python main.py discover
 
-   # Monthly profile refresh (1st of every month)
-   0 2 1 * * cd /opt/media_curator && ./venv/bin/python main.py profile
-   ```
+# Monthly profile refresh (1st of every month)
+0 2 1 * * cd /opt/media_curator && ./venv/bin/python main.py profile
+```
 
 ## Requirements
 - Python 3.11+

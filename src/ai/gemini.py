@@ -5,7 +5,7 @@ from src.config import Config
 class GeminiClient:
     def __init__(self, api_key=Config.GEMINI_API_KEY):
         self.client = genai.Client(api_key=api_key)
-        self.model_id = 'gemini-2.0-flash'
+        self.model_id = 'gemini-flash-latest'
 
     def generate_content(self, prompt, config=None):
         """Wrapper for simple content generation used by the Signal bot."""
