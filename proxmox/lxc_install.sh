@@ -39,8 +39,13 @@ function update_script() {
     fi
     
     msg_info "Updating ${APP}"
+    GH_TOKEN_VAL=""
     if command -v gh &> /dev/null; then
-        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | bash
+        GH_TOKEN_VAL=$(gh auth token 2>/dev/null || true)
+    fi
+
+    if [[ -n "$GH_TOKEN_VAL" ]]; then
+        (echo "export GH_TOKEN=\"$GH_TOKEN_VAL\""; gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh) | bash
     else
         curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | bash
     fi
@@ -97,8 +102,13 @@ function install_script() {
 
     msg_info "Running Application Setup"
     # Run app_setup.sh inside the container
+    GH_TOKEN_VAL=""
     if command -v gh &> /dev/null; then
-        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | pct exec "$CTID" -- bash
+        GH_TOKEN_VAL=$(gh auth token 2>/dev/null || true)
+    fi
+
+    if [[ -n "$GH_TOKEN_VAL" ]]; then
+        (echo "export GH_TOKEN=\"$GH_TOKEN_VAL\""; gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh) | pct exec "$CTID" -- bash
     else
         curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CTID" -- bash
     fi

@@ -13,11 +13,32 @@ echo "Updating container OS..."
 apt-get update && apt-get upgrade -y
 apt-get install -y python3 python3-venv git curl sqlite3
 
+# Install GitHub CLI if GH_TOKEN is provided and gh is not installed
+if [[ -n "$GH_TOKEN" ]] && ! command -v gh &> /dev/null; then
+    echo "Installing GitHub CLI..."
+    mkdir -p -m 755 /etc/apt/keyrings
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/keyrings/githubcli.list > /dev/null
+    apt-get update
+    apt-get install gh -y
+fi
+
+if [[ -n "$GH_TOKEN" ]]; then
+    echo "Authenticating GitHub CLI..."
+    echo "$GH_TOKEN" | gh auth login --with-token
+fi
+
 echo "Cloning Media Curator..."
 if command -v gh &> /dev/null; then
     gh repo clone ClemensSchartmueller/MediaCuratorAI $APP_DIR || (cd $APP_DIR && gh repo sync)
 else
-    git clone $REPO_URL $APP_DIR || (cd $APP_DIR && git pull)
+    # Fallback to git with token if available
+    if [[ -n "$GH_TOKEN" ]]; then
+        git clone https://x-access-token:${GH_TOKEN}@github.com/ClemensSchartmueller/MediaCuratorAI.git $APP_DIR || (cd $APP_DIR && git pull)
+    else
+        git clone $REPO_URL $APP_DIR || (cd $APP_DIR && git pull)
+    fi
 fi
 cd $APP_DIR
 
