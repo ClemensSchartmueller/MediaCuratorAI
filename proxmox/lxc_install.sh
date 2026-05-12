@@ -3,7 +3,7 @@
 # Media Curator Proxmox LXC Installer
 # Powered by ProxmoxVE Community Scripts
 
-set -euo pipefail
+set -eo pipefail
 
 # --- App Specific Variables ---
 # These are used by build.func to configure the container
