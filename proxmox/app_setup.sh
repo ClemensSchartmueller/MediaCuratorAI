@@ -14,7 +14,11 @@ apt-get update && apt-get upgrade -y
 apt-get install -y python3 python3-venv git curl sqlite3
 
 echo "Cloning Media Curator..."
-git clone $REPO_URL $APP_DIR || (cd $APP_DIR && git pull)
+if command -v gh &> /dev/null; then
+    gh repo clone ClemensSchartmueller/MediaCuratorAI $APP_DIR || (cd $APP_DIR && gh repo sync)
+else
+    git clone $REPO_URL $APP_DIR || (cd $APP_DIR && git pull)
+fi
 cd $APP_DIR
 
 echo "Setting up virtual environment..."

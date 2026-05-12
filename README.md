@@ -27,7 +27,12 @@ bash proxmox/lxc_install.sh
 
 1. **Clone & Install:**
    ```bash
+   # Using git
    git clone https://github.com/ClemensSchartmueller/MediaCuratorAI.git /opt/media-curator
+   
+   # Or using GitHub CLI
+   gh repo clone ClemensSchartmueller/MediaCuratorAI /opt/media-curator
+
    cd /opt/media-curator
    python3 -m venv venv
    source venv/bin/activate
