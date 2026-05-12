@@ -41,14 +41,14 @@ if pct status $CT_ID >/dev/null 2>&1; then
 fi
 
 # Get list of storages
-echo "Available storage for disk:"
+echo "Available storage for disk (rootdir):"
 pvesm status -content rootdir
 
 read -p "Enter Storage for disk [$STORAGE]: " input_storage
 STORAGE=${input_storage:-$STORAGE}
 
 # Get list of storages for templates
-echo "Available storage for templates:"
+echo "Available storage for templates (vztmpl):"
 pvesm status -content vztmpl
 TEMPLATE_STORAGE=$(pvesm status -content vztmpl | grep -v "Name" | head -1 | awk '{print $1}')
 read -p "Enter Storage for templates [$TEMPLATE_STORAGE]: " input_template_storage
@@ -62,11 +62,12 @@ echo "Ensuring template $TEMPLATE is available on $TEMPLATE_STORAGE..."
 pveam download $TEMPLATE_STORAGE $TEMPLATE || true
 
 echo "Creating LXC container $CT_ID ($CT_NAME)..."
+# Note: We use --rootfs with storage:size format. 
+# We remove the redundant --storage parameter which can cause parsing issues on some LVM setups.
 pct create $CT_ID "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
     --hostname $CT_NAME \
     --password $PASSWORD \
-    --storage $STORAGE \
-    --rootfs $STORAGE:$DISK_SIZE \
+    --rootfs "$STORAGE:$DISK_SIZE" \
     --memory $RAM \
     --cores $CORES \
     --net0 name=eth0,bridge=$BRIDGE,ip=$IP_ADDRESS \
