@@ -1,0 +1,8 @@
+[Unit]
+Description=Media Curator Weekly Discovery Service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/media-curator
+ExecStart=/usr/bin/python3 main.py discover

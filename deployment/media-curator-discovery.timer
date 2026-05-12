@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Media Curator Weekly Discovery
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
