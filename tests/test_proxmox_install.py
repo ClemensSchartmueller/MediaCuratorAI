@@ -12,7 +12,9 @@ class TestProxmoxInstaller(unittest.TestCase):
         )
         script = script_path.read_text()
 
-        matches = re.findall(r'pct\s+exec\s+"\$CTID"\s+--\s+bash\s+-s', script)
+        matches = re.findall(
+            r'pct\s+exec\s+["\']?\$CTID["\']?\s+--\s+bash\s+-s', script
+        )
 
         self.assertEqual(len(matches), EXPECTED_SETUP_INVOCATIONS)
 
