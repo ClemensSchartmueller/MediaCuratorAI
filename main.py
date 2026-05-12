@@ -10,6 +10,7 @@ import re
 def main():
     parser = argparse.ArgumentParser(description="Media Curator AI")
     parser.add_argument("command", choices=["profile", "discover", "listen"], help="Command to run")
+    parser.add_argument("--no-signal", action="store_true", help="Print output to CLI instead of sending via Signal (for testing)")
     args = parser.parse_args()
 
     if args.command == "profile":
@@ -21,37 +22,32 @@ def main():
     elif args.command == "discover":
         print("Running Weekly Discovery...")
         pipeline = DiscoveryPipeline()
-        curation_text = pipeline.run_weekly_discovery()
-        
-        # Parse curation_text to populate active_recommendations
-        # This is a bit tricky with raw LLM text, so we'll look for patterns
-        # [Title] (TMDB ID: [ID])
-        recs = []
-        matches = re.finditer(r"(.+?)\s*\(TMDB ID:\s*(\d+)\)", curation_text)
-        pos = 1
-        for match in matches:
-            title = match.group(1).strip("- ").strip()
-            tmdb_id = int(match.group(2))
-            # Determine type based on where it is in the text or another pattern
-            media_type = "movie" # Default, maybe check context in later versions
-            if "TV Series" in curation_text and curation_text.find(match.group(0)) > curation_text.find("TV Series"):
-                media_type = "tv"
+        try:
+            recs, raw_curation = pipeline.run_weekly_discovery()
             
-            recs.append({
-                "tmdb_id": tmdb_id,
-                "title": title,
-                "media_type": media_type,
-                "position": pos
-            })
-            pos += 1
-
-        db = Database()
-        db.set_active_recommendations(recs)
-        
-        # Send to Signal
-        bot = SignalBot()
-        bot.send_message(f"🎬 Weekly Media Recommendations 🎬\n\n{curation_text}\n\nReply with 'Add [Title]' or 'Download #1' to add to your library!")
-        print("Recommendations sent via Signal.")
+            db = Database()
+            db.set_active_recommendations(recs)
+            
+            # Format message for Signal
+            message = "🎬 Weekly Media Recommendations 🎬\n\n"
+            for rec in recs:
+                icon = "🎥" if rec['media_type'] == "movie" else "📺"
+                message += f"{rec['position']}. {icon} {rec['title']}\n"
+                message += f"   Why: {rec['justification']}\n\n"
+            
+            message += "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
+            
+            if args.no_signal:
+                print("\n--- TEST OUTPUT (No Signal) ---")
+                print(message)
+                print("-------------------------------\n")
+            else:
+                # Send to Signal
+                bot = SignalBot()
+                bot.send_message(message)
+                print("Recommendations sent via Signal.")
+        except Exception as e:
+            print(f"Error during discovery: {e}")
 
     elif args.command == "listen":
         print("Starting Signal Listener...")
