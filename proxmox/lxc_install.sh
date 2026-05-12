@@ -39,7 +39,6 @@ function update_script() {
     fi
     
     msg_info "Updating ${APP}"
-    # Use GitHub CLI if available, otherwise fallback to curl
     if command -v gh &> /dev/null; then
         gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | bash
     else
@@ -55,21 +54,41 @@ function install_script() {
     color
     catch_errors
     
-    # 2. Storage Selection and Confirmation
-    # The 'start' logic in build.func handles the Default/Advanced prompt
-    # but we need to ensure the variables are set correctly for our manual creation.
-    # Note: build.func handles most of this in advanced_settings/base_settings
+    # 2. Start UI and get Method (Default/Advanced)
+    # This sets the 'METHOD' variable
+    start
     
+    # 3. Populate Variables based on Method
+    # We call base_settings always to ensure defaults are loaded
+    base_settings
+    if [[ "$METHOD" == "advanced" ]]; then
+        advanced_settings
+    fi
+    
+    # 4. Storage Selection
+    # The build.func library has a function for this
+    # select_storage [type]
+    # Actually, we can use choose_and_set_storage_for_file
+    # rootdir = root filesystem for LXC
+    # vztmpl = container templates
+    msg_info "Selecting Storage"
+    choose_and_set_storage_for_file "rootdir"
+    CONTAINER_STORAGE=$STORAGE_RESULT
+    choose_and_set_storage_for_file "vztmpl"
+    TEMPLATE_STORAGE=$STORAGE_RESULT
+    msg_ok "Using ${CONTAINER_STORAGE} for disk and ${TEMPLATE_STORAGE} for templates"
+
+    # 5. Create LXC Container
     msg_info "Creating LXC Container"
     
     # Get template
     pveam update >/dev/null
     TEMPLATE=$(pveam available -section system | grep "${var_os}-${var_version}" | head -1 | awk '{print $2}')
-    msg_info "Using template: ${TEMPLATE} on ${TEMPLATE_STORAGE}"
+    msg_info "Using template: ${TEMPLATE}"
     pveam download $TEMPLATE_STORAGE $TEMPLATE >/dev/null || true
 
     # Create Container
-    # We use the variables set by the library's prompts
+    # We use the variables populated by base_settings/advanced_settings
     pct create $CT_ID "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
         --hostname $HN \
         --password $PASSWORD \
@@ -97,8 +116,10 @@ function install_script() {
 
 # --- Execution Flow ---
 
-# The start function in build.func will:
-# 1. Detect if running on host (via pveversion)
-# 2. If host: Call install_script
-# 3. If container: Call update_script
-start
+# Check if running on Proxmox Host
+if command -v pveversion >/dev/null 2>&1; then
+    install_script
+else
+    # We are inside the container (or at least not on the host)
+    update_script
+fi
