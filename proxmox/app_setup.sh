@@ -7,7 +7,7 @@ set -e
 
 # --- Configuration ---
 APP_DIR="/opt/media-curator"
-REPO_URL="https://github.com/your-repo/media_curator.git" # Replace with actual repo URL if known
+REPO_URL="https://github.com/ClemensSchartmueller/MediaCuratorAI.git"
 
 echo "Updating container OS..."
 apt-get update && apt-get upgrade -y
