@@ -26,7 +26,10 @@ fi
 
 if [[ -n "$GH_TOKEN" ]]; then
     echo "Authenticating GitHub CLI..."
-    echo "$GH_TOKEN" | gh auth login --with-token
+    # We must unset GH_TOKEN so gh auth login can actually write to the config file
+    # otherwise it just uses the env var and might skip the login process or warn.
+    _TOKEN="$GH_TOKEN"
+    (unset GH_TOKEN; echo "$_TOKEN" | gh auth login --with-token)
 fi
 
 echo "Cloning Media Curator..."
