@@ -73,6 +73,16 @@ function install_script() {
     fi
     TEMPLATE_STORAGE="${STORAGE_RESULT:-local}"
 
+    # 2.5 Password Handling
+    if [ -z "$PW" ]; then
+      PASSWORD=$(whiptail --backtitle "Proxmox VE Helper Scripts" --title "ROOT PASSWORD" --passwordbox "\nSet a password for the 'root' user (required for shell login):" 10 60 3>&1 1>&2 2>&3) || exit
+      if [ -z "$PASSWORD" ]; then
+        msg_error "Password is required for root access."
+        exit 1
+      fi
+      PW="-password $PASSWORD"
+    fi
+
     # 3. Create LXC Container
     msg_info "Creating LXC Container"
     
@@ -112,6 +122,7 @@ function install_script() {
     else
         curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CTID" -- bash
     fi
+    msg_ok "Completed Application Setup"
     
     description
 }
