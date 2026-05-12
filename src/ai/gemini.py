@@ -1,13 +1,18 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from src.config import Config
 
 class GeminiClient:
     def __init__(self, api_key=Config.GEMINI_API_KEY):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        self.search_model = genai.GenerativeModel(
-            'gemini-1.5-flash-latest',
-            tools=[{"google_search_retrieval": {}}]
+        self.client = genai.Client(api_key=api_key)
+        self.model_id = 'gemini-1.5-flash-latest'
+
+    def generate_content(self, prompt, config=None):
+        """Wrapper for simple content generation used by the Signal bot."""
+        return self.client.models.generate_content(
+            model=self.model_id,
+            contents=prompt,
+            config=config
         )
 
     def generate_taste_profile(self, watch_history_summary):
@@ -20,7 +25,7 @@ class GeminiClient:
         Watch History:
         {watch_history_summary}
         """
-        response = self.model.generate_content(prompt)
+        response = self.generate_content(prompt)
         return response.text.strip()
 
     def curate_recommendations(self, taste_profile, candidates):
@@ -33,12 +38,19 @@ class GeminiClient:
         Using Google Search to verify current critical consensus and audience reception (e.g., from Reddit, Rotten Tomatoes), 
         select the top 5 movies and top 3 TV series from the candidates that best match the User Taste Profile.
         
-        For each selection, provide:
-        1. Title
-        2. TMDB ID (exactly as provided in candidates)
-        3. A one-sentence justification explaining why it matches the profile.
-        
-        Return the result in a structured format that I can easily parse (JSON-like or clear list).
+        Return the result as a JSON object with a key 'recommendations' containing a list of objects.
+        Each object must have:
+        - "title": The title of the movie or series.
+        - "tmdb_id": The exact TMDB ID provided in candidates.
+        - "media_type": Either "movie" or "tv".
+        - "justification": A one-sentence explanation of why it matches the profile.
+
+        Ensure the output is ONLY the JSON object.
         """
-        response = self.search_model.generate_content(prompt)
+        response = self.generate_content(
+            prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
+        )
         return response.text.strip()

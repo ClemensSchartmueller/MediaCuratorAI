@@ -52,7 +52,7 @@ class SignalBot:
         """
         
         # Use simple flash model for quick interpretation
-        intent_response = self.gemini.model.generate_content(prompt).text.strip()
+        intent_response = self.gemini.generate_content(prompt).text.strip()
         # Clean up JSON if LLM added backticks
         if "```json" in intent_response:
             intent_response = intent_response.split("```json")[1].split("```")[0].strip()
@@ -62,12 +62,18 @@ class SignalBot:
             results = []
             for item in items_to_add:
                 if item['type'] == 'movie':
-                    # Assuming some defaults for root folder and quality profile
-                    # These should be in Config or fetched
-                    res = self.radarr.add_movie(item['tmdb_id'], "/data/media/movies", 1)
+                    res = self.radarr.add_movie(
+                        item['tmdb_id'], 
+                        Config.RADARR_ROOT_FOLDER, 
+                        Config.RADARR_QUALITY_PROFILE
+                    )
                     results.append(f"Added Movie: {item['title']}")
                 elif item['type'] == 'tv':
-                    res = self.sonarr.add_series(item['tmdb_id'], "/data/media/tv", 1)
+                    res = self.sonarr.add_series(
+                        item['tmdb_id'], 
+                        Config.SONARR_ROOT_FOLDER, 
+                        Config.SONARR_QUALITY_PROFILE
+                    )
                     results.append(f"Added Series: {item['title']}")
             
             if results:
