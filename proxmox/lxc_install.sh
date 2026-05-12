@@ -16,6 +16,7 @@ export var_unprivileged="1"
 export NSAPP="media-curator"
 
 # --- Source Community Functions ---
+# We source the library to get access to whiptail menus, storage selection, and UI helpers
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
 
 function header_info() {
@@ -30,7 +31,7 @@ cat <<EOF
 EOF
 }
 
-# This function runs when the script is executed INSIDE the LXC
+# This function runs when the script is executed INSIDE the LXC (Update Mode)
 function update_script() {
     header_info
     if [[ ! -d /opt/media-curator ]]; then
@@ -47,21 +48,27 @@ function update_script() {
     msg_ok "Updated ${APP}"
 }
 
-# This function runs on the Proxmox Host to handle the installation
+# This function overrides the community's install_script to handle our custom installation flow
 function install_script() {
-    # 1. Populate Variables based on Method (Default/Advanced)
-    # The 'start' function (called at the end of this file) already prompted the user
-    # and set the 'METHOD' variable.
+    # 1. Initialize environment and get user configuration (Default/Advanced)
+    # The 'start' function already called this or prompted the user.
+    # We call base_settings to ensure we have defaults for everything.
     base_settings
     if [[ "$METHOD" == "advanced" ]]; then
         advanced_settings
     fi
     
     # 2. Storage Selection
+    # We use a temporary file for the library's storage selection logic
+    VARS_FILE="/tmp/media-curator.vars"
+    touch "$VARS_FILE"
+    
     msg_info "Selecting Storage"
-    choose_and_set_storage_for_file "rootdir"
+    # Args: vars_file class('container'|'template')
+    choose_and_set_storage_for_file "$VARS_FILE" "container"
     CONTAINER_STORAGE=$STORAGE_RESULT
-    choose_and_set_storage_for_file "vztmpl"
+    
+    choose_and_set_storage_for_file "$VARS_FILE" "template"
     TEMPLATE_STORAGE=$STORAGE_RESULT
     msg_ok "Using ${CONTAINER_STORAGE} for disk and ${TEMPLATE_STORAGE} for templates"
 
@@ -72,29 +79,30 @@ function install_script() {
     pveam update >/dev/null
     TEMPLATE=$(pveam available -section system | grep "${var_os}-${var_version}" | head -1 | awk '{print $2}')
     msg_info "Using template: ${TEMPLATE}"
-    pveam download $TEMPLATE_STORAGE $TEMPLATE >/dev/null || true
+    pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null || true
 
     # Create Container
-    pct create $CT_ID "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
-        --hostname $HN \
-        --password $PASSWORD \
+    # We use the variables populated by base_settings/advanced_settings/choose_and_set_storage
+    pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
+        --hostname "$HN" \
+        --password "$PASSWORD" \
         --rootfs "volume=${CONTAINER_STORAGE},size=${DISK_SIZE}G" \
-        --memory $RAM_SIZE \
-        --cores $CORE_COUNT \
-        --net0 name=eth0,bridge=$BRG,ip=$NET$GATE \
+        --memory "$RAM_SIZE" \
+        --cores "$CORE_COUNT" \
+        --net0 "name=eth0,bridge=${BRG:-vmbr0},ip=${NET:-dhcp}${GATE:-}" \
         --onboot 1 \
-        --unprivileged $CT_TYPE \
-        --features nesting=1
+        --unprivileged "$CT_TYPE" \
+        --features "nesting=1"
 
-    pct start $CT_ID
+    pct start "$CT_ID"
     msg_ok "Created LXC Container ${CT_ID}"
 
     msg_info "Running Application Setup"
     # Run app_setup.sh inside the container
     if command -v gh &> /dev/null; then
-        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | pct exec $CT_ID -- bash
+        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | pct exec "$CT_ID" -- bash
     else
-        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec $CT_ID -- bash
+        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CT_ID" -- bash
     fi
     
     description
@@ -102,14 +110,13 @@ function install_script() {
 
 # --- Execution Flow ---
 
-# We MUST NOT call install_script or update_script directly here.
-# Instead, we call 'start' which is provided by build.func.
-# 'start' will:
-# 1. Detect environment (Host vs Container)
-# 2. If Host: Show Default/Advanced prompt, set METHOD, then call install_script()
-# 3. If Container: Call update_script()
+# 1. Basic initialization
 header_info
 variables
 color
 catch_errors
+
+# 2. Detect environment and start the appropriate flow
+# If running on Proxmox host, 'start' will prompt for Default/Advanced and then call install_script()
+# If running in container, 'start' will call update_script()
 start
