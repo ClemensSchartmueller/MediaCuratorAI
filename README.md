@@ -14,7 +14,7 @@ If you are running Proxmox VE, you can use the automated installer. Run this com
 
 ```bash
 # Using wget
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/master/proxmox/lxc_install.sh)"
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/lxc_install.sh)"
 
 # Or using GitHub CLI
 bash -c "$(gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/lxc_install.sh)"

@@ -39,25 +39,66 @@ function update_script() {
     fi
     
     msg_info "Updating ${APP}"
-    # Fetch and run the app setup script which handles the actual logic (git pull, pip install, etc)
-    curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/master/proxmox/app_setup.sh | bash
+    # Use GitHub CLI if available, otherwise fallback to curl
+    if command -v gh &> /dev/null; then
+        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | bash
+    else
+        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | bash
+    fi
     msg_ok "Updated ${APP}"
+}
+
+# This function runs on the Proxmox Host to handle the installation
+function install_script() {
+    # 1. Initialize environment and get user configuration
+    variables
+    color
+    catch_errors
+    
+    # 2. Storage Selection and Confirmation
+    # The 'start' logic in build.func handles the Default/Advanced prompt
+    # but we need to ensure the variables are set correctly for our manual creation.
+    # Note: build.func handles most of this in advanced_settings/base_settings
+    
+    msg_info "Creating LXC Container"
+    
+    # Get template
+    pveam update >/dev/null
+    TEMPLATE=$(pveam available -section system | grep "${var_os}-${var_version}" | head -1 | awk '{print $2}')
+    msg_info "Using template: ${TEMPLATE} on ${TEMPLATE_STORAGE}"
+    pveam download $TEMPLATE_STORAGE $TEMPLATE >/dev/null || true
+
+    # Create Container
+    # We use the variables set by the library's prompts
+    pct create $CT_ID "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
+        --hostname $HN \
+        --password $PASSWORD \
+        --rootfs "volume=${CONTAINER_STORAGE},size=${DISK_SIZE}G" \
+        --memory $RAM_SIZE \
+        --cores $CORE_COUNT \
+        --net0 name=eth0,bridge=$BRG,ip=$NET$GATE \
+        --onboot 1 \
+        --unprivileged $CT_TYPE \
+        --features nesting=1
+
+    pct start $CT_ID
+    msg_ok "Created LXC Container ${CT_ID}"
+
+    msg_info "Running Application Setup"
+    # Run app_setup.sh inside the container
+    if command -v gh &> /dev/null; then
+        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh | pct exec $CT_ID -- bash
+    else
+        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec $CT_ID -- bash
+    fi
+    
+    description
 }
 
 # --- Execution Flow ---
 
-# If we are NOT running in an LXC, we are on the Proxmox Host -> Install Mode
-if [[ ! -d /etc/pve ]]; then
-    # We are inside the container (or at least not on the host)
-    update_script
-    exit
-fi
-
-# We are on the host -> Run installation logic
-header_info
-variables
-color
-catch_errors
+# The start function in build.func will:
+# 1. Detect if running on host (via pveversion)
+# 2. If host: Call install_script
+# 3. If container: Call update_script
 start
-build_container
-description
