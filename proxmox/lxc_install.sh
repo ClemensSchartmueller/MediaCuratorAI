@@ -1,100 +1,71 @@
 #!/usr/bin/env bash
 
 # Media Curator Proxmox LXC Installer
-# Inspired by ProxmoxVE Community Scripts
+# Powered by ProxmoxVE Community Scripts
 
 set -euo pipefail
 
-# --- Defaults ---
-CT_ID=$(pvesh get /cluster/nextid)
-CT_NAME="media-curator"
-DISK_SIZE="8G"
-RAM="1024"
-CORES="1"
-BRIDGE="vmbr0"
-GATEWAY=""
-IP_ADDRESS="dhcp"
-STORAGE="local-lvm"
-PASSWORD="media" # Default password, user should change it
+# --- App Specific Variables ---
+# These are used by build.func to configure the container
+export APP="Media-Curator"
+export var_os="debian"
+export var_version="12"
+export var_cpu="1"
+export var_ram="1024"
+export var_disk="8"
+export var_unprivileged="1"
+# We define a custom setup function that will be called after container creation
+export NSAPP="media-curator"
 
-echo "-------------------------------------------------------"
-echo "  Media Curator LXC Installer for Proxmox VE"
-echo "-------------------------------------------------------"
+# --- Source Community Functions ---
+# This library handles storage selection, template downloads, and pct create logic
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
 
-# Check if running on Proxmox
-if ! command -v pveversion >/dev/null 2>&1; then
-    echo "Error: This script must be run on a Proxmox VE host."
-    exit 1
-fi
+# --- Overrides and Custom Logic ---
 
-# Ask for configuration (simplified for now)
-read -p "Enter Container ID [$CT_ID]: " input_id
-CT_ID=${input_id:-$CT_ID}
+function header_info() {
+cat <<EOF
+  __  __          _ _         _____                _             
+ |  \/  |        | (_)       / ____|              | |            
+ | \  / | ___  __| |_  __ _ | |    _   _ _ __ __ _| |_ ___  _ __ 
+ | |\/| |/ _ \/ _  | |/ _  || |   | | | | '__/ _  | __/ _ \| '__|
+ | |  | |  __/ (_| | | (_| || |___| |_| | | | (_| | || (_) | |   
+ |_|  |_|\___|\__,_|_|\__,_| \_____\__,_|_|  \__,_|\__\___/|_|   
+                                                                 
+EOF
+}
 
-read -p "Enter Hostname [$CT_NAME]: " input_name
-CT_NAME=${input_name:-$CT_NAME}
+# The build_container function in build.func will call this if it exists
+# to perform app-specific installation inside the container.
+function update_script() {
+    header_info
+    echo -e "${GN}Running Application Setup...${CL}"
+    
+    # We download the app_setup.sh from the repository and run it
+    # This ensures the latest version is used even if the local host script is older.
+    curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/master/proxmox/app_setup.sh | bash
+}
 
-# Check if container already exists
-if pct status $CT_ID >/dev/null 2>&1; then
-    echo "Error: Container $CT_ID already exists."
-    exit 1
-fi
+# --- Execution ---
 
-# Get list of storages
-echo "Available storage for disk (rootdir):"
-pvesm status -content rootdir | grep -v "Name" || true
+# 1. Initialize environment
+header_info
+variables
+color
+catch_errors
 
-read -p "Enter Storage ID for disk [$STORAGE]: " input_storage
-STORAGE=${input_storage:-$STORAGE}
+# 2. Trigger standardized build process
+# This handles:
+# - Validating Proxmox host
+# - Advanced vs Default settings prompt
+# - Storage selection (fixes the "no such logical volume" issues)
+# - Template download
+# - pct create
+# - Starting container
+start
 
-# Validate storage
-if ! pvesm status $STORAGE >/dev/null 2>&1; then
-    echo "Error: Storage ID '$STORAGE' not found in Proxmox."
-    exit 1
-fi
+# 3. Build and Configure
+build_container
 
-# Get list of storages for templates
-echo "Available storage for templates (vztmpl):"
-pvesm status -content vztmpl | grep -v "Name" || true
-TEMPLATE_STORAGE=$(pvesm status -content vztmpl | grep -v "Name" | head -1 | awk '{print $1}')
-read -p "Enter Storage ID for templates [$TEMPLATE_STORAGE]: " input_template_storage
-TEMPLATE_STORAGE=${input_template_storage:-$TEMPLATE_STORAGE}
-
-echo "Fetching Debian 12 template..."
-pveam update
-TEMPLATE=$(pveam available -section system | grep "debian-12-standard" | head -1 | awk '{print $2}')
-
-echo "Ensuring template $TEMPLATE is available on $TEMPLATE_STORAGE..."
-pveam download $TEMPLATE_STORAGE $TEMPLATE || true
-
-echo "Creating LXC container $CT_ID ($CT_NAME)..."
-# Using the most explicit syntax to force volume creation
-# --rootfs volume=<STORAGE>,size=<SIZE>
-pct create $CT_ID "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
-    --hostname $CT_NAME \
-    --password $PASSWORD \
-    --rootfs "volume=$STORAGE,size=$DISK_SIZE" \
-    --memory $RAM \
-    --cores $CORES \
-    --net0 name=eth0,bridge=$BRIDGE,ip=$IP_ADDRESS \
-    --onboot 1 \
-    --unprivileged 1 \
-    --features nesting=1
-
-echo "Starting container..."
-pct start $CT_ID
-
-echo "Waiting for network to be ready..."
-sleep 5
-
-# Transfer and run setup script
-echo "Running application setup inside container..."
-# In a real scenario, we might download the script directly in the LXC or pipe it
-cat proxmox/app_setup.sh | pct exec $CT_ID -- bash
-
-echo "-------------------------------------------------------"
-echo "  Installation Complete!"
-echo "  Container ID: $CT_ID"
-echo "  Hostname: $CT_NAME"
-echo "  Access it via: pct enter $CT_ID"
-echo "-------------------------------------------------------"
+# 4. Final Description
+description
