@@ -49,28 +49,15 @@ function update_script() {
 
 # This function runs on the Proxmox Host to handle the installation
 function install_script() {
-    # 1. Initialize environment and get user configuration
-    variables
-    color
-    catch_errors
-    
-    # 2. Start UI and get Method (Default/Advanced)
-    # This sets the 'METHOD' variable
-    start
-    
-    # 3. Populate Variables based on Method
-    # We call base_settings always to ensure defaults are loaded
+    # 1. Populate Variables based on Method (Default/Advanced)
+    # The 'start' function (called at the end of this file) already prompted the user
+    # and set the 'METHOD' variable.
     base_settings
     if [[ "$METHOD" == "advanced" ]]; then
         advanced_settings
     fi
     
-    # 4. Storage Selection
-    # The build.func library has a function for this
-    # select_storage [type]
-    # Actually, we can use choose_and_set_storage_for_file
-    # rootdir = root filesystem for LXC
-    # vztmpl = container templates
+    # 2. Storage Selection
     msg_info "Selecting Storage"
     choose_and_set_storage_for_file "rootdir"
     CONTAINER_STORAGE=$STORAGE_RESULT
@@ -78,7 +65,7 @@ function install_script() {
     TEMPLATE_STORAGE=$STORAGE_RESULT
     msg_ok "Using ${CONTAINER_STORAGE} for disk and ${TEMPLATE_STORAGE} for templates"
 
-    # 5. Create LXC Container
+    # 3. Create LXC Container
     msg_info "Creating LXC Container"
     
     # Get template
@@ -88,7 +75,6 @@ function install_script() {
     pveam download $TEMPLATE_STORAGE $TEMPLATE >/dev/null || true
 
     # Create Container
-    # We use the variables populated by base_settings/advanced_settings
     pct create $CT_ID "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
         --hostname $HN \
         --password $PASSWORD \
@@ -116,10 +102,14 @@ function install_script() {
 
 # --- Execution Flow ---
 
-# Check if running on Proxmox Host
-if command -v pveversion >/dev/null 2>&1; then
-    install_script
-else
-    # We are inside the container (or at least not on the host)
-    update_script
-fi
+# We MUST NOT call install_script or update_script directly here.
+# Instead, we call 'start' which is provided by build.func.
+# 'start' will:
+# 1. Detect environment (Host vs Container)
+# 2. If Host: Show Default/Advanced prompt, set METHOD, then call install_script()
+# 3. If Container: Call update_script()
+header_info
+variables
+color
+catch_errors
+start
