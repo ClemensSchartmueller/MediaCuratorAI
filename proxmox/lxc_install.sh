@@ -72,6 +72,7 @@ function update_script() {
         curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | bash
     fi
     msg_ok "Updated ${APP}"
+    exit
 }
 
 # --- Execution Flow ---
@@ -84,3 +85,7 @@ catch_errors
 # 2. Detect environment and start the appropriate flow (Install or Update)
 # Standard start() will call install_script() which now uses the robust community flow
 start
+build_container
+description
+
+msg_ok "Completed Successfully"
