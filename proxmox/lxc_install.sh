@@ -50,9 +50,7 @@ function update_script() {
 
 # This function overrides the community's install_script to handle our custom installation flow
 function install_script() {
-    # 1. Initialize environment and get user configuration (Default/Advanced)
-    # The 'start' function already called this or prompted the user.
-    # We call base_settings to ensure we have defaults for everything.
+    # 1. Populate Variables based on Method (Default/Advanced)
     base_settings
     if [[ "$METHOD" == "advanced" ]]; then
         advanced_settings
@@ -63,14 +61,12 @@ function install_script() {
     VARS_FILE="/tmp/media-curator.vars"
     touch "$VARS_FILE"
     
-    msg_info "Selecting Storage"
-    # Args: vars_file class('container'|'template')
+    # We remove msg_info here as it breaks the following whiptail dialogs
     choose_and_set_storage_for_file "$VARS_FILE" "container"
     CONTAINER_STORAGE=$STORAGE_RESULT
     
     choose_and_set_storage_for_file "$VARS_FILE" "template"
     TEMPLATE_STORAGE=$STORAGE_RESULT
-    msg_ok "Using ${CONTAINER_STORAGE} for disk and ${TEMPLATE_STORAGE} for templates"
 
     # 3. Create LXC Container
     msg_info "Creating LXC Container"
@@ -78,11 +74,9 @@ function install_script() {
     # Get template
     pveam update >/dev/null
     TEMPLATE=$(pveam available -section system | grep "${var_os}-${var_version}" | head -1 | awk '{print $2}')
-    msg_info "Using template: ${TEMPLATE}"
     pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null || true
 
     # Create Container
-    # We use the variables populated by base_settings/advanced_settings/choose_and_set_storage
     pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
         --hostname "$HN" \
         --password "$PASSWORD" \
@@ -111,12 +105,10 @@ function install_script() {
 # --- Execution Flow ---
 
 # 1. Basic initialization
-header_info
+# Note: We do NOT call header_info here as it breaks the whiptail UI initialization in start
 variables
 color
 catch_errors
 
 # 2. Detect environment and start the appropriate flow
-# If running on Proxmox host, 'start' will prompt for Default/Advanced and then call install_script()
-# If running in container, 'start' will call update_script()
 start
