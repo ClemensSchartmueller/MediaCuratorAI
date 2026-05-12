@@ -1,6 +1,7 @@
 import unittest
 from src.utils.llm import extract_json_from_response
 
+
 class TestLLMUtils(unittest.TestCase):
     def test_extract_json_with_backticks(self):
         text = '```json\n{"key": "value"}\n```'
@@ -21,6 +22,7 @@ class TestLLMUtils(unittest.TestCase):
         text = 'Here is the result:\n```json\n{"key": "value"}\n```'
         expected = '{"key": "value"}'
         self.assertEqual(extract_json_from_response(text), expected)
+
 
 if __name__ == "__main__":
     unittest.main()

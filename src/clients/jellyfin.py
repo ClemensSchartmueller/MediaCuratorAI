@@ -1,5 +1,6 @@
 from .base import BaseClient
 
+
 class JellyfinClient(BaseClient):
     def __init__(self, base_url, api_key, user_id):
         super().__init__(base_url, api_key)
@@ -19,7 +20,7 @@ class JellyfinClient(BaseClient):
             "Recursive": True,
             "IsPlayed": True,
             "Fields": "Genres,Overview,OfficialRating",
-            "IncludeItemTypes": "Movie,Series"
+            "IncludeItemTypes": "Movie,Series",
         }
         return self._get(endpoint, params=params)
 
@@ -31,6 +32,6 @@ class JellyfinClient(BaseClient):
             "Limit": limit,
             "Recursive": True,
             "Fields": "Genres,Overview",
-            "IncludeItemTypes": "Movie,Series"
+            "IncludeItemTypes": "Movie,Series",
         }
         return self._get(endpoint, params=params)

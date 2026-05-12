@@ -8,6 +8,7 @@ from src.utils.llm import extract_json_from_response
 import time
 import json
 
+
 class SignalBot:
     def __init__(self):
         self.url = Config.SIGNAL_URL.rstrip("/")
@@ -22,7 +23,7 @@ class SignalBot:
         payload = {
             "message": text,
             "number": self.number,
-            "recipients": [self.recipient]
+            "recipients": [self.recipient],
         }
         response = requests.post(f"{self.url}/v2/send", json=payload)
         response.raise_for_status()
@@ -37,7 +38,9 @@ class SignalBot:
 
     def handle_reply(self, reply_text):
         # 1. Use Gemini to interpret intent and map to active recommendations
-        active_recs = self.db.get_recommendation_by_position(1) # Just checking if we have any
+        active_recs = self.db.get_recommendation_by_position(
+            1
+        )  # Just checking if we have any
         if not active_recs:
             return "No active recommendations to act on."
 
@@ -51,30 +54,30 @@ class SignalBot:
         Return a JSON list of objects with 'tmdb_id', 'title', and 'type' (movie/tv).
         If they don't want to add anything, return an empty list [].
         """
-        
+
         # Use simple flash model for quick interpretation
         intent_response = self.gemini.generate_content(prompt).text
         intent_response = extract_json_from_response(intent_response)
-        
+
         try:
             items_to_add = json.loads(intent_response)
             results = []
             for item in items_to_add:
-                if item['type'] == 'movie':
+                if item["type"] == "movie":
                     res = self.radarr.add_movie(
-                        item['tmdb_id'], 
-                        Config.RADARR_ROOT_FOLDER, 
-                        Config.RADARR_QUALITY_PROFILE
+                        item["tmdb_id"],
+                        Config.RADARR_ROOT_FOLDER,
+                        Config.RADARR_QUALITY_PROFILE,
                     )
                     results.append(f"Added Movie: {item['title']}")
-                elif item['type'] == 'tv':
+                elif item["type"] == "tv":
                     res = self.sonarr.add_series(
-                        item['tmdb_id'], 
-                        Config.SONARR_ROOT_FOLDER, 
-                        Config.SONARR_QUALITY_PROFILE
+                        item["tmdb_id"],
+                        Config.SONARR_ROOT_FOLDER,
+                        Config.SONARR_QUALITY_PROFILE,
                     )
                     results.append(f"Added Series: {item['title']}")
-            
+
             if results:
                 return "\n".join(results)
             else:
@@ -86,9 +89,13 @@ class SignalBot:
         # Fetch all active recs from DB and format
         with self.db._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT position, title, tmdb_id, media_type FROM active_recommendations")
+            cursor.execute(
+                "SELECT position, title, tmdb_id, media_type FROM active_recommendations"
+            )
             rows = cursor.fetchall()
-            return "\n".join([f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows])
+            return "\n".join(
+                [f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows]
+            )
 
     def listen_loop(self):
         print("Signal listener started...")
@@ -97,15 +104,15 @@ class SignalBot:
                 messages = self.receive_messages()
                 for msg in messages:
                     # Filter for messages from our recipient
-                    envelope = msg.get('envelope', {})
-                    source = envelope.get('source')
-                    data_msg = envelope.get('dataMessage', {})
-                    text = data_msg.get('message')
-                    
+                    envelope = msg.get("envelope", {})
+                    source = envelope.get("source")
+                    data_msg = envelope.get("dataMessage", {})
+                    text = data_msg.get("message")
+
                     if source == self.recipient and text:
                         print(f"Received: {text}")
                         response_text = self.handle_reply(text)
                         self.send_message(response_text)
             except Exception as e:
                 print(f"Error in listen loop: {e}")
-            time.sleep(5) # Poll every 5 seconds
+            time.sleep(5)  # Poll every 5 seconds
