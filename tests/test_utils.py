@@ -39,6 +39,19 @@ class TestLLMUtils(unittest.TestCase):
         expected = '{"key": "value"}'
         self.assertEqual(extract_json_from_response(text), expected)
 
+    def test_extract_json_with_no_newline_before_closing_fence(self):
+        text = '```json\n{"key": "value"}```'
+        expected = '{"key": "value"}'
+        self.assertEqual(extract_json_from_response(text), expected)
+
+    def test_extract_json_does_not_treat_jsonnet_as_json(self):
+        text = (
+            "```jsonnet\nnot json\n```\n"
+            '```json\n{"key": "value"}\n```'
+        )
+        expected = '{"key": "value"}'
+        self.assertEqual(extract_json_from_response(text), expected)
+
 
 if __name__ == "__main__":
     unittest.main()
