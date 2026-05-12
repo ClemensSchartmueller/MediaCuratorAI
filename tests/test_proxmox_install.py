@@ -1,4 +1,5 @@
 import unittest
+import re
 from pathlib import Path
 
 
@@ -9,7 +10,9 @@ class TestProxmoxInstaller(unittest.TestCase):
         )
         script = script_path.read_text()
 
-        self.assertEqual(script.count('pct exec "$CTID" -- bash -s'), 2)
+        matches = re.findall(r'pct\s+exec\s+"\$CTID"\s+--\s+bash\s+-s', script)
+
+        self.assertEqual(len(matches), 2)
 
 
 if __name__ == "__main__":
