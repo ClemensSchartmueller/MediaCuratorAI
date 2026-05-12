@@ -4,6 +4,7 @@ from src.database import Database
 from src.clients.radarr import RadarrClient
 from src.clients.sonarr import SonarrClient
 from src.ai.gemini import GeminiClient
+from src.utils.llm import extract_json_from_response
 import time
 import json
 
@@ -52,10 +53,8 @@ class SignalBot:
         """
         
         # Use simple flash model for quick interpretation
-        intent_response = self.gemini.generate_content(prompt).text.strip()
-        # Clean up JSON if LLM added backticks
-        if "```json" in intent_response:
-            intent_response = intent_response.split("```json")[1].split("```")[0].strip()
+        intent_response = self.gemini.generate_content(prompt).text
+        intent_response = extract_json_from_response(intent_response)
         
         try:
             items_to_add = json.loads(intent_response)

@@ -3,6 +3,7 @@ from src.clients.radarr import RadarrClient
 from src.clients.sonarr import SonarrClient
 from src.clients.jellyfin import JellyfinClient
 from src.ai.gemini import GeminiClient
+from src.utils.llm import extract_json_from_response
 from src.database import Database
 from src.config import Config
 import json
@@ -71,11 +72,7 @@ class DiscoveryPipeline:
         
         # 7. Parse and return
         # Clean up JSON if LLM added backticks
-        json_str = raw_curation
-        if "```json" in json_str:
-            json_str = json_str.split("```json")[1].split("```")[0].strip()
-        elif "```" in json_str:
-            json_str = json_str.split("```")[1].split("```")[0].strip()
+        json_str = extract_json_from_response(raw_curation)
             
         try:
             data = json.loads(json_str)
