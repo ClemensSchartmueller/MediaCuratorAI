@@ -56,8 +56,8 @@ function install_script() {
     fi
     
     # 2. Storage Selection
-    msg_info "Selecting Storage"
     # We use the internal select_storage and provide fallbacks to ensure variables are set
+    # Note: No msg_info here as it breaks the following whiptail dialogs
     if ! select_storage "container"; then
         STORAGE_RESULT=$(pvesm status -content rootdir | awk 'NR>1{print $1; exit}')
     fi
@@ -67,7 +67,6 @@ function install_script() {
         STORAGE_RESULT=$(pvesm status -content vztmpl | awk 'NR>1{print $1; exit}')
     fi
     TEMPLATE_STORAGE="${STORAGE_RESULT:-local}"
-    msg_ok "Using ${CONTAINER_STORAGE} for disk and ${TEMPLATE_STORAGE} for templates"
 
     # 3. Create LXC Container
     msg_info "Creating LXC Container"
