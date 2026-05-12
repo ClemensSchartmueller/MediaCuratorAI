@@ -8,12 +8,27 @@ AI-driven media recommendation daemon for self-hosted stacks.
 - **AI Curation:** Uses Google Gemini with Google Search grounding to pick the best releases based on your profile.
 - **Signal Integration:** Weekly recommendations sent via Signal; supports natural language replies to add media to Radarr/Sonarr.
 
-## Setup
+## Proxmox LXC Installation
+
+If you are running Proxmox VE, you can use the automated installer. Run this command on your **Proxmox host**:
+
+```bash
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/your-repo/media-curator/master/proxmox/lxc_install.sh)"
+```
+
+Alternatively, if you have the repo cloned locally on the host:
+```bash
+bash proxmox/lxc_install.sh
+```
+
+---
+
+## Manual Setup (LXC or Linux)
 
 1. **Clone & Install:**
    ```bash
-   git clone <repo-url> /opt/media_curator
-   cd /opt/media_curator
+   git clone <repo-url> /opt/media-curator
+   cd /opt/media-curator
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
@@ -42,10 +57,10 @@ You can use the provided systemd timer (recommended for LXC) or traditional cron
 If using cron:
 ```cron
 # Weekly discovery (Sundays at 10 AM)
-0 10 * * 0 cd /opt/media_curator && ./venv/bin/python main.py discover
+0 10 * * 0 cd /opt/media-curator && ./venv/bin/python main.py discover
 
 # Monthly profile refresh (1st of every month)
-0 2 1 * * cd /opt/media_curator && ./venv/bin/python main.py profile
+0 2 1 * * cd /opt/media-curator && ./venv/bin/python main.py profile
 ```
 
 ## Requirements

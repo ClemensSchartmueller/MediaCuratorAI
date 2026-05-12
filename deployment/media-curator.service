@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/media-curator
-ExecStart=/usr/bin/python3 main.py listen
+ExecStart=/opt/media-curator/venv/bin/python main.py listen
 Restart=always
 RestartSec=10
 

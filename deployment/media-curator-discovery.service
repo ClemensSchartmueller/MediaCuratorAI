@@ -5,4 +5,4 @@ Description=Media Curator Weekly Discovery Service
 Type=oneshot
 User=root
 WorkingDirectory=/opt/media-curator
-ExecStart=/usr/bin/python3 main.py discover
+ExecStart=/opt/media-curator/venv/bin/python main.py discover
