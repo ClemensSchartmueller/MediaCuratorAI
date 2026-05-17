@@ -8,6 +8,13 @@ import json
 import re
 
 def main():
+    # Reconfigure stdout/stderr to UTF-8 to support printing emojis on all platforms
+    if sys.platform == "win32":
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8')
+
     parser = argparse.ArgumentParser(description="Media Curator AI")
     parser.add_argument("command", choices=["profile", "discover", "listen"], help="Command to run")
     parser.add_argument("--no-signal", action="store_true", help="Print output to CLI instead of sending via Signal (for testing)")

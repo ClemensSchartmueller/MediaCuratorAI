@@ -54,11 +54,14 @@ class SignalBot:
         # Use simple flash model for quick interpretation
         intent_response = self.gemini.generate_content(prompt).text.strip()
         # Clean up JSON if LLM added backticks
-        if "```json" in intent_response:
-            intent_response = intent_response.split("```json")[1].split("```")[0].strip()
+        json_str = intent_response
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0].strip()
         
         try:
-            items_to_add = json.loads(intent_response)
+            items_to_add = json.loads(json_str)
             results = []
             for item in items_to_add:
                 if item['type'] == 'movie':
@@ -79,6 +82,8 @@ class SignalBot:
             if results:
                 return "\n".join(results)
             else:
+                if isinstance(items_to_add, list) and len(items_to_add) == 0:
+                    return "No recommended items were added to your library."
                 return "I couldn't figure out which item you meant. Could you be more specific?"
         except Exception as e:
             return f"Error processing request: {str(e)}"
