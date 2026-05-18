@@ -70,6 +70,10 @@ systemctl enable --now media-curator-discovery.timer
 echo "Restarting service to apply updates..."
 systemctl restart media-curator.service
 
+echo "Creating update script shortcut..."
+echo 'bash /opt/media-curator/proxmox/lxc_install.sh # /ct/media-curator.sh)' > /usr/bin/update
+chmod +x /usr/bin/update
+
 echo "Setup complete!"
 echo "Next steps:"
 echo "1. Edit /opt/media-curator/.env with your credentials."
