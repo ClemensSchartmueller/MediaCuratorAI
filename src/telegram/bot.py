@@ -7,31 +7,45 @@ from src.ai.gemini import GeminiClient
 import time
 import json
 
-class SignalBot:
+class TelegramBot:
     def __init__(self):
-        self.url = Config.SIGNAL_URL.rstrip("/")
-        self.number = Config.SIGNAL_NUMBER
-        self.recipient = Config.SIGNAL_RECIPIENT
+        self.token = Config.TELEGRAM_BOT_TOKEN
+        self.chat_id = Config.TELEGRAM_CHAT_ID
+        self.offset = None
         self.db = Database()
         self.radarr = RadarrClient(Config.RADARR_URL, Config.RADARR_API_KEY)
         self.sonarr = SonarrClient(Config.SONARR_URL, Config.SONARR_API_KEY)
         self.gemini = GeminiClient()
 
     def send_message(self, text):
+        if not self.token or not self.chat_id:
+            print("Telegram Bot Token or Chat ID not configured. Skipping send_message.")
+            return {}
+        url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         payload = {
-            "message": text,
-            "number": self.number,
-            "recipients": [self.recipient]
+            "chat_id": self.chat_id,
+            "text": text
         }
-        response = requests.post(f"{self.url}/v2/send", json=payload)
+        response = requests.post(url, json=payload, timeout=10)
         response.raise_for_status()
         return response.json()
 
     def receive_messages(self):
-        # Long polling or frequent polling of the receive endpoint
-        response = requests.get(f"{self.url}/v1/receive/{self.number}")
-        if response.status_code == 200:
-            return response.json()
+        if not self.token:
+            print("Telegram Bot Token not configured. Skipping receive_messages.")
+            return []
+        url = f"https://api.telegram.org/bot{self.token}/getUpdates"
+        params = {}
+        if self.offset:
+            params["offset"] = self.offset
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("ok"):
+                    return data.get("result", [])
+        except Exception as e:
+            print(f"Error fetching updates from Telegram: {e}")
         return []
 
     def handle_reply(self, reply_text):
@@ -97,18 +111,20 @@ class SignalBot:
             return "\n".join([f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows])
 
     def listen_loop(self):
-        print("Signal listener started...")
+        print("Telegram listener started...")
         while True:
             try:
-                messages = self.receive_messages()
-                for msg in messages:
-                    # Filter for messages from our recipient
-                    envelope = msg.get('envelope', {})
-                    source = envelope.get('source')
-                    data_msg = envelope.get('dataMessage', {})
-                    text = data_msg.get('message')
+                updates = self.receive_messages()
+                for update in updates:
+                    update_id = update.get("update_id")
+                    self.offset = update_id + 1
                     
-                    if source == self.recipient and text:
+                    message = update.get("message", {})
+                    chat = message.get("chat", {})
+                    chat_id = chat.get("id")
+                    text = message.get("text")
+                    
+                    if str(chat_id) == str(self.chat_id) and text:
                         print(f"Received: {text}")
                         response_text = self.handle_reply(text)
                         self.send_message(response_text)
