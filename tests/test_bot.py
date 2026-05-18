@@ -7,8 +7,8 @@ class TestTelegramBot(unittest.TestCase):
     @patch('src.telegram.bot.SonarrClient')
     @patch('src.telegram.bot.RadarrClient')
     @patch('src.telegram.bot.Database')
-    @patch('src.telegram.bot.requests')
-    def test_handle_reply_movie(self, mock_requests, MockDB, MockRadarr, MockSonarr, MockGemini):
+    @patch('src.telegram.bot.telebot')
+    def test_handle_reply_movie(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockGemini):
         mock_db = MockDB.return_value
         mock_db.get_recommendation_by_position.return_value = {"id": 1}
         
@@ -36,8 +36,8 @@ class TestTelegramBot(unittest.TestCase):
     @patch('src.telegram.bot.SonarrClient')
     @patch('src.telegram.bot.RadarrClient')
     @patch('src.telegram.bot.Database')
-    @patch('src.telegram.bot.requests')
-    def test_handle_reply_no_recs(self, mock_requests, MockDB, MockRadarr, MockSonarr, MockGemini):
+    @patch('src.telegram.bot.telebot')
+    def test_handle_reply_no_recs(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockGemini):
         mock_db = MockDB.return_value
         mock_db.get_recommendation_by_position.return_value = None # No active recs
         

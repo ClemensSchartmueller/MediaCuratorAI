@@ -1,52 +1,36 @@
-import requests
+import telebot
 from src.config import Config
 from src.database import Database
 from src.clients.radarr import RadarrClient
 from src.clients.sonarr import SonarrClient
 from src.ai.gemini import GeminiClient
-import time
 import json
 
 class TelegramBot:
     def __init__(self):
         self.token = Config.TELEGRAM_BOT_TOKEN
         self.chat_id = Config.TELEGRAM_CHAT_ID
-        self.offset = None
         self.db = Database()
         self.radarr = RadarrClient(Config.RADARR_URL, Config.RADARR_API_KEY)
         self.sonarr = SonarrClient(Config.SONARR_URL, Config.SONARR_API_KEY)
         self.gemini = GeminiClient()
+        
+        if self.token:
+            self.bot = telebot.TeleBot(self.token)
+        else:
+            self.bot = None
 
     def send_message(self, text):
-        if not self.token or not self.chat_id:
+        if not self.bot or not self.chat_id:
             print("Telegram Bot Token or Chat ID not configured. Skipping send_message.")
             return {}
-        url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        payload = {
-            "chat_id": self.chat_id,
-            "text": text
-        }
-        response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-        return response.json()
-
-    def receive_messages(self):
-        if not self.token:
-            print("Telegram Bot Token not configured. Skipping receive_messages.")
-            return []
-        url = f"https://api.telegram.org/bot{self.token}/getUpdates"
-        params = {}
-        if self.offset:
-            params["offset"] = self.offset
         try:
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("ok"):
-                    return data.get("result", [])
+            res = self.bot.send_message(self.chat_id, text)
+            # Return the message dict for mock compatibility in test suite
+            return res.json if hasattr(res, "json") else {}
         except Exception as e:
-            print(f"Error fetching updates from Telegram: {e}")
-        return []
+            print(f"Error sending message via Telegram: {e}")
+            raise
 
     def handle_reply(self, reply_text):
         # 1. Use Gemini to interpret intent and map to active recommendations
@@ -111,23 +95,22 @@ class TelegramBot:
             return "\n".join([f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows])
 
     def listen_loop(self):
+        if not self.bot or not self.chat_id:
+            print("Telegram Bot Token or Chat ID not configured. Cannot start listen loop.")
+            return
+
         print("Telegram listener started...")
-        while True:
-            try:
-                updates = self.receive_messages()
-                for update in updates:
-                    update_id = update.get("update_id")
-                    self.offset = update_id + 1
-                    
-                    message = update.get("message", {})
-                    chat = message.get("chat", {})
-                    chat_id = chat.get("id")
-                    text = message.get("text")
-                    
-                    if str(chat_id) == str(self.chat_id) and text:
-                        print(f"Received: {text}")
-                        response_text = self.handle_reply(text)
-                        self.send_message(response_text)
-            except Exception as e:
-                print(f"Error in listen loop: {e}")
-            time.sleep(5) # Poll every 5 seconds
+        
+        @self.bot.message_handler(func=lambda msg: str(msg.chat.id) == str(self.chat_id))
+        def message_received(message):
+            text = message.text
+            if text:
+                print(f"Received: {text}")
+                response_text = self.handle_reply(text)
+                try:
+                    self.bot.reply_to(message, response_text)
+                except Exception as e:
+                    print(f"Error replying to message: {e}")
+
+        # Starts clean polling optimized for LXC environment (low CPU/memory usage, auto-reconnects on drop)
+        self.bot.infinity_polling(timeout=20, long_polling_timeout=20)
