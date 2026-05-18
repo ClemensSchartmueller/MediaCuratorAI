@@ -18,8 +18,11 @@ class TelegramBot:
         self.tmdb = TMDBClient(Config.TMDB_API_KEY)
         self.gemini = GeminiClient()
         
-        self.last_interaction_time = 0.0
-        self.compressed_context = ""
+        # Load persisted states
+        self.compressed_context = self.db.get_state("compressed_context") or ""
+        last_int_str = self.db.get_state("last_interaction_time")
+        self.last_interaction_time = float(last_int_str) if last_int_str else 0.0
+        
         self.base_system_instruction = (
             "You are Media Curator AI, a highly agentic media assistant. "
             "You have direct access to tools to download movies/series, get media information, "
@@ -36,21 +39,24 @@ class TelegramBot:
             bot_instance=self
         )
         
-        self._recreate_chat_session()
+        # Load persisted chat history
+        initial_history = self.db.get_chat_history()
+        self._recreate_chat_session(history=initial_history)
         
         if self.token:
             self.bot = telebot.TeleBot(self.token)
         else:
             self.bot = None
 
-    def _recreate_chat_session(self):
+    def _recreate_chat_session(self, history=None):
         instruction = self.base_system_instruction
         if self.compressed_context:
             instruction += f"\n\nHere is a summary of the past conversation history for context:\n{self.compressed_context}"
         
         self.chat = self.gemini.create_chat_session(
             tools=self.tools,
-            system_instruction=instruction
+            system_instruction=instruction,
+            history=history
         )
 
     def _format_history_for_summary(self):
@@ -92,13 +98,39 @@ class TelegramBot:
             summary = f"Failed to generate summary: {str(e)}"
         
         self.compressed_context = summary
+        self.db.set_state("compressed_context", summary)
+        self.db.clear_chat_history()
         self._recreate_chat_session()
         return summary
 
     def _clear_history_action(self) -> str:
         self.compressed_context = ""
+        self.db.set_state("compressed_context", "")
+        self.db.clear_chat_history()
         self._recreate_chat_session()
         return "Conversation history completely cleared."
+
+    def _save_session_to_db(self):
+        try:
+            history = self.chat.get_history()
+        except Exception:
+            return
+        
+        history_to_save = []
+        for item in history:
+            role = getattr(item, 'role', 'unknown')
+            text_parts = []
+            for part in getattr(item, 'parts', []):
+                text = getattr(part, 'text', None)
+                if text:
+                    text_parts.append(text)
+            if text_parts:
+                history_to_save.append({
+                    "role": role,
+                    "text": "\n".join(text_parts)
+                })
+        
+        self.db.save_chat_history(history_to_save)
 
     def send_message(self, text):
         if not self.bot or not self.chat_id:
@@ -125,9 +157,11 @@ class TelegramBot:
                 self._compress_history_action()
         
         self.last_interaction_time = now
+        self.db.set_state("last_interaction_time", str(now))
 
         try:
             response = self.chat.send_message(reply_text)
+            self._save_session_to_db()
             return response.text
         except Exception as e:
             return f"An error occurred while communicating with Gemini: {str(e)}"

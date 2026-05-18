@@ -44,6 +44,62 @@ class TestTelegramBot(unittest.TestCase):
         
         self.assertIn("An error occurred while communicating with Gemini", response)
 
+    @patch('src.telegram.bot.time.time')
+    @patch('src.telegram.bot.GeminiClient')
+    @patch('src.telegram.bot.TMDBClient')
+    @patch('src.telegram.bot.SonarrClient')
+    @patch('src.telegram.bot.RadarrClient')
+    @patch('src.telegram.bot.Database')
+    @patch('src.telegram.bot.telebot')
+    def test_database_persistence_flow(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini, mock_time):
+        mock_time.return_value = 12345.6 + 100.0
+        mock_db = MockDB.return_value
+        mock_db.get_state.side_effect = lambda k: "compressed summary" if k == "compressed_context" else "12345.6"
+        mock_db.get_chat_history.return_value = [{"role": "user", "text": "Hi"}]
+
+        mock_gemini = MockGemini.return_value
+        mock_chat = MagicMock()
+        mock_gemini.create_chat_session.return_value = mock_chat
+
+        mock_response = MagicMock()
+        mock_response.text = "Hello"
+        mock_chat.send_message.return_value = mock_response
+
+        # Mock get_history to return parts
+        mock_item = MagicMock()
+        mock_item.role = "user"
+        mock_part = MagicMock()
+        mock_part.text = "Hi"
+        mock_item.parts = [mock_part]
+        mock_chat.get_history.return_value = [mock_item]
+
+        # Init bot
+        bot = TelegramBot()
+
+        # Assert database loading at startup
+        self.assertEqual(bot.compressed_context, "compressed summary")
+        self.assertEqual(bot.last_interaction_time, 12345.6)
+        mock_db.get_chat_history.assert_called_once()
+        mock_gemini.create_chat_session.assert_called_once_with(
+            tools=bot.tools,
+            system_instruction=bot.base_system_instruction + "\n\nHere is a summary of the past conversation history for context:\ncompressed summary",
+            history=[{"role": "user", "text": "Hi"}]
+        )
+
+        # Handle a reply
+        res = bot.handle_reply("How are you?")
+        self.assertEqual(res, "Hello")
+
+        # Assert database saving
+        mock_db.set_state.assert_any_call("last_interaction_time", str(bot.last_interaction_time))
+        mock_db.save_chat_history.assert_called_once()
+
+        # Clear history action
+        bot._clear_history_action()
+        mock_db.set_state.assert_any_call("compressed_context", "")
+        mock_db.clear_chat_history.assert_called_once()
+
+
     @patch('src.telegram.bot.GeminiClient')
     @patch('src.telegram.bot.TMDBClient')
     @patch('src.telegram.bot.SonarrClient')

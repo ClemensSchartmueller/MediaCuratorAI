@@ -55,7 +55,7 @@ class GeminiClient:
         )
         return response.text.strip()
 
-    def create_chat_session(self, tools=None, system_instruction=None):
+    def create_chat_session(self, tools=None, system_instruction=None, history=None):
         """Creates a stateful conversational chat session with auto-function calling enabled."""
         config_kwargs = {}
         if tools:
@@ -64,5 +64,17 @@ class GeminiClient:
             config_kwargs['system_instruction'] = system_instruction
             
         config = types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
-        return self.client.chats.create(model=self.model_id, config=config)
+        
+        contents = []
+        if history:
+            for turn in history:
+                contents.append(
+                    types.Content(
+                        role=turn['role'],
+                        parts=[types.Part.from_text(text=turn['text'])]
+                    )
+                )
+                
+        return self.client.chats.create(model=self.model_id, config=config, history=contents)
+
 
