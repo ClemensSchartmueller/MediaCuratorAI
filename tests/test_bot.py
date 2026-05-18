@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import time
 from src.telegram.bot import TelegramBot
 from src.ai.agent_tools import create_tools
 
@@ -43,20 +44,95 @@ class TestTelegramBot(unittest.TestCase):
         
         self.assertIn("An error occurred while communicating with Gemini", response)
 
+    @patch('src.telegram.bot.GeminiClient')
+    @patch('src.telegram.bot.TMDBClient')
+    @patch('src.telegram.bot.SonarrClient')
+    @patch('src.telegram.bot.RadarrClient')
+    @patch('src.telegram.bot.Database')
+    @patch('src.telegram.bot.telebot')
+    def test_clear_history_action(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini):
+        mock_gemini = MockGemini.return_value
+        mock_chat = MagicMock()
+        mock_gemini.create_chat_session.return_value = mock_chat
+        
+        bot = TelegramBot()
+        bot.compressed_context = "some past context"
+        
+        res = bot._clear_history_action()
+        self.assertEqual(res, "Conversation history completely cleared.")
+        self.assertEqual(bot.compressed_context, "")
+        # Should recreate the session twice: once at __init__ and once at _clear_history_action
+        self.assertEqual(mock_gemini.create_chat_session.call_count, 2)
+
+    @patch('src.telegram.bot.GeminiClient')
+    @patch('src.telegram.bot.TMDBClient')
+    @patch('src.telegram.bot.SonarrClient')
+    @patch('src.telegram.bot.RadarrClient')
+    @patch('src.telegram.bot.Database')
+    @patch('src.telegram.bot.telebot')
+    def test_compress_history_action(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini):
+        mock_gemini = MockGemini.return_value
+        mock_chat = MagicMock()
+        mock_gemini.create_chat_session.return_value = mock_chat
+        
+        # Mock get_history to return some contents
+        mock_msg = MagicMock()
+        mock_msg.role = 'user'
+        mock_part = MagicMock()
+        mock_part.text = "Tell me a joke"
+        mock_msg.parts = [mock_part]
+        mock_chat.get_history.return_value = [mock_msg]
+        
+        # Mock gemini.generate_content for summarization
+        mock_summary_resp = MagicMock()
+        mock_summary_resp.text = "Summary: requested jokes"
+        mock_gemini.generate_content.return_value = mock_summary_resp
+        
+        bot = TelegramBot()
+        res = bot._compress_history_action()
+        
+        self.assertEqual(res, "Summary: requested jokes")
+        self.assertEqual(bot.compressed_context, "Summary: requested jokes")
+        mock_gemini.generate_content.assert_called_once()
+
+    @patch('src.telegram.bot.GeminiClient')
+    @patch('src.telegram.bot.TMDBClient')
+    @patch('src.telegram.bot.SonarrClient')
+    @patch('src.telegram.bot.RadarrClient')
+    @patch('src.telegram.bot.Database')
+    @patch('src.telegram.bot.telebot')
+    def test_automatic_24h_compression(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini):
+        mock_gemini = MockGemini.return_value
+        mock_chat = MagicMock()
+        mock_gemini.create_chat_session.return_value = mock_chat
+        
+        bot = TelegramBot()
+        bot.last_interaction_time = time.time() - 90000  # 25 hours ago
+        
+        # Mock format history to return non-empty so compression triggers
+        bot._format_history_for_summary = MagicMock(return_value="User: Hello")
+        bot._compress_history_action = MagicMock(return_value="Summary")
+        bot.send_message = MagicMock()
+        
+        bot.handle_reply("New message")
+        
+        bot._compress_history_action.assert_called_once()
+        bot.send_message.assert_called_with("📦 Automatic 24-hour history compression triggered.")
+
 
 class TestAgentTools(unittest.TestCase):
     def setUp(self):
         self.mock_tmdb = MagicMock()
         self.mock_radarr = MagicMock()
         self.mock_sonarr = MagicMock()
-        self.mock_notify = MagicMock()
+        self.mock_bot = MagicMock()
+        
         self.tools = create_tools(
             self.mock_tmdb,
             self.mock_radarr,
             self.mock_sonarr,
-            self.mock_notify
+            self.mock_bot
         )
-        # Find tools by name
         self.tools_dict = {t.__name__: t for t in self.tools}
 
     def test_add_movie_success(self):
@@ -77,17 +153,16 @@ class TestAgentTools(unittest.TestCase):
         self.assertIn("Could not find any movie matching", res)
         self.mock_radarr.add_movie.assert_not_called()
 
-    @patch('time.sleep', return_value=None) # avoid delay in tests
+    @patch('time.sleep', return_value=None)
     def test_retry_logic_failure_then_success(self, mock_sleep):
         add_movie = self.tools_dict['add_movie_to_library']
-        # Fail first, succeed second
         self.mock_tmdb.search_multi.side_effect = [Exception("Temporary Timeout"), {
             'results': [{'media_type': 'movie', 'id': 123, 'title': 'Dune'}]
         }]
         
         res = add_movie("Dune")
         self.assertIn("Successfully added movie 'Dune'", res)
-        self.mock_notify.assert_any_call("⚠️ Rate limit or API error during adding movie 'Dune'. Retrying in 2s... (Attempt 1/3)")
+        self.mock_bot.send_message.assert_any_call("⚠️ Rate limit or API error during adding movie 'Dune'. Retrying in 2s... (Attempt 1/3)")
 
     @patch('time.sleep', return_value=None)
     def test_retry_logic_exhaustion(self, mock_sleep):
@@ -96,7 +171,7 @@ class TestAgentTools(unittest.TestCase):
         
         res = add_movie("Dune")
         self.assertIn("Failed to execute adding movie 'Dune' after 3 attempts", res)
-        self.mock_notify.assert_any_call("❌ Failed to execute adding movie 'Dune' after 3 attempts. Error: Persistent Timeout")
+        self.mock_bot.send_message.assert_any_call("❌ Failed to execute adding movie 'Dune' after 3 attempts. Error: Persistent Timeout")
 
     def test_add_series_success(self):
         add_series = self.tools_dict['add_series_to_library']
@@ -155,6 +230,22 @@ class TestAgentTools(unittest.TestCase):
         mock_profiler.run.assert_called_once()
         mock_pipeline.run_weekly_discovery.assert_called_once()
         mock_db.set_active_recommendations.assert_called_once()
+
+    def test_clear_chat_history_tool(self):
+        clear_history = self.tools_dict['clear_chat_history']
+        self.mock_bot._clear_history_action.return_value = "Cleared"
+        
+        res = clear_history()
+        self.assertEqual(res, "Cleared")
+        self.mock_bot._clear_history_action.assert_called_once()
+
+    def test_compress_chat_history_tool(self):
+        compress_history = self.tools_dict['compress_chat_history']
+        self.mock_bot._compress_history_action.return_value = "Compressed"
+        
+        res = compress_history()
+        self.assertEqual(res, "Compressed")
+        self.mock_bot._compress_history_action.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

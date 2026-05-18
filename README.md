@@ -12,6 +12,9 @@ AI-driven media recommendation daemon for self-hosted stacks.
   - **Ask for details:** "Tell me about Interstellar" or "What is the plot of Dune?".
   - **Download specific media directly:** "Download Inception" or "Add Breaking Bad to my library".
 - **Resilient API Calls:** Automatic retry logic with real-time status updates posted directly in Telegram if API timeouts or rate limits occur (e.g., "⚠️ Rate limit or API error during adding movie. Retrying...").
+- **Context History Management:** Smart session tracking avoids expanding Gemini context windows and controls API costs:
+  - **Automatic 24-Hour Compression:** If you don't message the bot for 24 hours, it automatically compresses the conversation history into a concise context summary.
+  - **Manual Clear/Compress Commands:** Send `/clear` or `/compress` directly in Telegram, or conversationally ask the bot *"please clear my history"* or *"compress our conversation"*, and the agent will execute the tool autonomously.
 
 ## Proxmox LXC Installation
 

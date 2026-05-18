@@ -20,7 +20,8 @@ def _execute_with_retry(fn, notify_fn, label, max_retries=3):
             time.sleep(delay)
             delay *= 2
 
-def create_tools(tmdb, radarr, sonarr, notify_fn):
+def create_tools(tmdb, radarr, sonarr, bot_instance):
+    notify_fn = bot_instance.send_message
     
     def add_movie_to_library(title: str) -> str:
         """Searches TMDB for the movie and adds it via Radarr. Use this when the user explicitly wants to download or add a movie."""
@@ -135,10 +136,20 @@ def create_tools(tmdb, radarr, sonarr, notify_fn):
             
         return _execute_with_retry(action, notify_fn, "generating fresh proposals")
 
+    def clear_chat_history() -> str:
+        """Completely clears all conversation history and resets the assistant's state. Use this when the user explicitly requests to clear, reset, or wipe their chat history."""
+        return bot_instance._clear_history_action()
+
+    def compress_chat_history() -> str:
+        """Compresses the conversation history into a concise context summary to save API tokens and memory. Use this when the user explicitly requests to compress, condense, or summarize history."""
+        return bot_instance._compress_history_action()
+
     return [
         add_movie_to_library,
         add_series_to_library,
         get_media_information,
         discover_by_genre,
-        generate_new_proposals
+        generate_new_proposals,
+        clear_chat_history,
+        compress_chat_history
     ]
