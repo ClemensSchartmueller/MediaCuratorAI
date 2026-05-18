@@ -1,4 +1,5 @@
 from .base import BaseClient
+from .exceptions import MediaAlreadyExistsError
 
 class RadarrClient(BaseClient):
     def get_movies(self):
@@ -10,7 +11,7 @@ class RadarrClient(BaseClient):
         
         # Pre-check if movie is already in the library to avoid 400 Bad Request
         if movie_info.get("id") is not None and movie_info.get("id") > 0:
-            return f"The movie '{movie_info.get('title')}' is already in your Radarr library!"
+            raise MediaAlreadyExistsError("movie", movie_info.get("title"), "Radarr")
 
         # Fetch and validate root folders dynamically
         try:

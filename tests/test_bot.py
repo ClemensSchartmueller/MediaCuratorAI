@@ -4,6 +4,7 @@ import time
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from src.telegram.bot import TelegramBot
 from src.ai.agent_tools import create_tools, _is_retryable_error
+from src.clients.exceptions import MediaAlreadyExistsError
 
 
 class TestTelegramBot(unittest.TestCase):
@@ -310,6 +311,21 @@ class TestAgentTools(unittest.TestCase):
         self.assertIn("Could not find any movie matching", res)
         self.mock_radarr.add_movie.assert_not_called()
 
+    def test_add_movie_duplicate(self):
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_multi.return_value = {
+            "results": [{"media_type": "movie", "id": 123, "title": "Dune"}]
+        }
+        self.mock_radarr.add_movie.side_effect = MediaAlreadyExistsError(
+            "movie", "Dune", "Radarr"
+        )
+
+        res = add_movie("Dune")
+        self.assertEqual(
+            "The movie 'Dune' is already in your Radarr library!",
+            res,
+        )
+
     def test_add_movie_ambiguous_requires_clarification(self):
         add_movie = self.tools_dict["add_movie_to_library"]
         self.mock_tmdb.search_multi.return_value = {
@@ -423,6 +439,21 @@ class TestAgentTools(unittest.TestCase):
         res = add_series("Shogun")
         self.assertIn("Multiple TV series matches found", res)
         self.mock_sonarr.add_series.assert_not_called()
+
+    def test_add_series_duplicate(self):
+        add_series = self.tools_dict["add_series_to_library"]
+        self.mock_tmdb.search_multi.return_value = {
+            "results": [{"media_type": "tv", "id": 456, "name": "Breaking Bad"}]
+        }
+        self.mock_sonarr.add_series.side_effect = MediaAlreadyExistsError(
+            "series", "Breaking Bad", "Sonarr"
+        )
+
+        res = add_series("Breaking Bad")
+        self.assertEqual(
+            "The series 'Breaking Bad' is already in your Sonarr library!",
+            res,
+        )
 
     def test_get_media_information_movie(self):
         get_info = self.tools_dict["get_media_information"]

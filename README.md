@@ -11,7 +11,7 @@ AI-driven media recommendation daemon for self-hosted stacks.
   - **Discover by genre:** "What are some good recent comedy movies?" or "Show me scary TV series".
   - **Ask for details:** "Tell me about Interstellar" or "What is the plot of Dune?".
   - **Download specific media directly:** "Download Inception" or "Add Breaking Bad to my library".
-- **Resilient API Calls:** Automatic retry logic with real-time status updates posted directly in Telegram if API timeouts or rate limits occur. Includes dynamic root folder and quality profile validation (with auto-fallback to active defaults if misconfigured) and proactive duplicate pre-checks to completely eliminate "Bad Request" exceptions.
+- **Resilient API Calls:** Automatic retry logic with real-time status updates posted directly in Telegram if API timeouts or rate limits occur. Includes dynamic root folder and quality profile validation (with fallback to the first available options if misconfigured) and proactive duplicate pre-checks to reduce common "Bad Request" scenarios.
 - **Context History Management:** Smart session tracking avoids expanding Gemini context windows, controls API costs, and survives system restarts:
   - **Persistent Conversational Memory:** Conversation history, last interaction timestamps, and compressed context summaries are saved in the local SQLite database, ensuring memory survives service or container restarts.
   - **Automatic 24-Hour Compression:** If you don't message the bot for 24 hours, it automatically compresses the conversation history into a concise context summary.

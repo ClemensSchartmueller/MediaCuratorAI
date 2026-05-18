@@ -2,6 +2,7 @@ import time
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from src.ai.profiler import Profiler
 from src.ai.discovery import DiscoveryPipeline
+from src.clients.exceptions import MediaAlreadyExistsError
 from src.database import Database
 from src.config import Config
 
@@ -67,13 +68,17 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
                     f"Please be more specific (for example include the year): {', '.join(candidates)}."
                 )
             best_match = movies[0]
-            res = radarr.add_movie(
-                best_match["id"],
-                Config.RADARR_ROOT_FOLDER,
-                Config.RADARR_QUALITY_PROFILE,
-            )
-            if isinstance(res, str):
-                return res
+            try:
+                radarr.add_movie(
+                    best_match["id"],
+                    Config.RADARR_ROOT_FOLDER,
+                    Config.RADARR_QUALITY_PROFILE,
+                )
+            except MediaAlreadyExistsError as e:
+                return (
+                    f"The {e.media_kind} '{e.title}' is already in your "
+                    f"{e.library_name} library!"
+                )
             return f"Successfully added movie '{best_match.get('title')}' to your Radarr library!"
 
         return _execute_with_retry(action, notify_fn, f"adding movie '{title}'")
@@ -103,13 +108,17 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
                     f"Please be more specific (for example include the year): {', '.join(candidates)}."
                 )
             best_match = series[0]
-            res = sonarr.add_series(
-                best_match["id"],
-                Config.SONARR_ROOT_FOLDER,
-                Config.SONARR_QUALITY_PROFILE,
-            )
-            if isinstance(res, str):
-                return res
+            try:
+                sonarr.add_series(
+                    best_match["id"],
+                    Config.SONARR_ROOT_FOLDER,
+                    Config.SONARR_QUALITY_PROFILE,
+                )
+            except MediaAlreadyExistsError as e:
+                return (
+                    f"The {e.media_kind} '{e.title}' is already in your "
+                    f"{e.library_name} library!"
+                )
             return f"Successfully added series '{best_match.get('name')}' to your Sonarr library!"
 
         return _execute_with_retry(action, notify_fn, f"adding series '{title}'")

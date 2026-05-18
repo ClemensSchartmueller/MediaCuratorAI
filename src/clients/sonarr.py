@@ -1,4 +1,5 @@
 from .base import BaseClient
+from .exceptions import MediaAlreadyExistsError
 
 class SonarrClient(BaseClient):
     def get_series(self):
@@ -16,7 +17,9 @@ class SonarrClient(BaseClient):
                 if (s.get("tvdbId") == series_info.get("tvdbId")) or \
                    (s.get("tmdbId") and s.get("tmdbId") == series_info.get("tmdbId")) or \
                    (s.get("tmdbId") and s.get("tmdbId") == tmdb_id):
-                    return f"The series '{series_info.get('title')}' is already in your Sonarr library!"
+                    raise MediaAlreadyExistsError(
+                        "series", series_info.get("title"), "Sonarr"
+                    )
         except Exception as e:
             print(f"Warning: Failed to check for duplicate series in Sonarr: {str(e)}")
 
