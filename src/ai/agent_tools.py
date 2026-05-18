@@ -67,11 +67,13 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
                     f"Please be more specific (for example include the year): {', '.join(candidates)}."
                 )
             best_match = movies[0]
-            radarr.add_movie(
+            res = radarr.add_movie(
                 best_match["id"],
                 Config.RADARR_ROOT_FOLDER,
                 Config.RADARR_QUALITY_PROFILE,
             )
+            if isinstance(res, str):
+                return res
             return f"Successfully added movie '{best_match.get('title')}' to your Radarr library!"
 
         return _execute_with_retry(action, notify_fn, f"adding movie '{title}'")
@@ -101,11 +103,13 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
                     f"Please be more specific (for example include the year): {', '.join(candidates)}."
                 )
             best_match = series[0]
-            sonarr.add_series(
+            res = sonarr.add_series(
                 best_match["id"],
                 Config.SONARR_ROOT_FOLDER,
                 Config.SONARR_QUALITY_PROFILE,
             )
+            if isinstance(res, str):
+                return res
             return f"Successfully added series '{best_match.get('name')}' to your Sonarr library!"
 
         return _execute_with_retry(action, notify_fn, f"adding series '{title}'")
