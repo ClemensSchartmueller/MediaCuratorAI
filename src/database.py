@@ -41,6 +41,25 @@ class Database:
                     added_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Table for persistent conversation history
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    role TEXT,
+                    text TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Table for arbitrary chat states (e.g. compressed_context, last_interaction_time)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     def save_taste_profile(self, profile_text):
@@ -79,3 +98,45 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("SELECT tmdb_id, title, media_type FROM active_recommendations WHERE title LIKE ?", (f"%{fragment}%",))
             return cursor.fetchone()
+
+    def save_chat_history(self, history):
+        # history is a list of dicts: {'role': 'user'|'model', 'text': '...'}
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chat_history")
+            for turn in history:
+                cursor.execute("""
+                    INSERT INTO chat_history (role, text)
+                    VALUES (?, ?)
+                """, (turn['role'], turn['text']))
+            conn.commit()
+
+    def get_chat_history(self):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT role, text FROM chat_history ORDER BY id ASC")
+            rows = cursor.fetchall()
+            return [{"role": r[0], "text": r[1]} for r in rows]
+
+    def clear_chat_history(self):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chat_history")
+            conn.commit()
+
+    def set_state(self, key, value):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO chat_state (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            """, (key, value))
+            conn.commit()
+
+    def get_state(self, key):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM chat_state WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+

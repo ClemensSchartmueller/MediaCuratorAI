@@ -1,10 +1,13 @@
 import telebot
+import time
 from src.config import Config
 from src.database import Database
 from src.clients.radarr import RadarrClient
 from src.clients.sonarr import SonarrClient
+from src.clients.tmdb import TMDBClient
 from src.ai.gemini import GeminiClient
-import json
+from src.ai.agent_tools import create_tools
+
 
 class TelegramBot:
     def __init__(self):
@@ -13,16 +16,133 @@ class TelegramBot:
         self.db = Database()
         self.radarr = RadarrClient(Config.RADARR_URL, Config.RADARR_API_KEY)
         self.sonarr = SonarrClient(Config.SONARR_URL, Config.SONARR_API_KEY)
+        self.tmdb = TMDBClient(Config.TMDB_API_KEY)
         self.gemini = GeminiClient()
-        
+
+        # Load persisted states
+        self.compressed_context = self.db.get_state("compressed_context") or ""
+        last_int_str = self.db.get_state("last_interaction_time")
+        self.last_interaction_time = float(last_int_str) if last_int_str else 0.0
+
+        self.base_system_instruction = (
+            "You are Media Curator AI, a highly agentic media assistant. "
+            "You have direct access to tools to download movies/series, get media information, "
+            "recommend media by genre, and generate weekly recommendation proposals. "
+            "Autonomously call the relevant tool when a user makes a request. "
+            "Always be polite, helpful, and concise in your natural language replies."
+        )
+
+        # Instantiate standalone tool list using our factory
+        self.tools = create_tools(
+            tmdb=self.tmdb, radarr=self.radarr, sonarr=self.sonarr, bot_instance=self
+        )
+
+        # Load persisted chat history
+        initial_history = self.db.get_chat_history()
+        self._recreate_chat_session(history=initial_history)
+
         if self.token:
             self.bot = telebot.TeleBot(self.token)
         else:
             self.bot = None
 
+    def _recreate_chat_session(self, history=None):
+        instruction = self.base_system_instruction
+        if self.compressed_context:
+            instruction += f"\n\nHere is a summary of the past conversation history for context:\n{self.compressed_context}"
+
+        self.chat = self.gemini.create_chat_session(
+            tools=self.tools, system_instruction=instruction, history=history
+        )
+
+    def _format_history_for_summary(self):
+        try:
+            history = self.chat.get_history()
+        except Exception:
+            return ""
+
+        lines = []
+        for item in history:
+            role = getattr(item, "role", "unknown")
+            for part in getattr(item, "parts", []):
+                text = getattr(part, "text", None)
+                if text:
+                    lines.append(f"{role.capitalize()}: {text}")
+                elif getattr(part, "function_call", None):
+                    lines.append(
+                        f"{role.capitalize()} called tool: {part.function_call.name}"
+                    )
+                elif getattr(part, "function_response", None):
+                    lines.append(f"Tool returned: {part.function_response.response}")
+        return "\n".join(lines)
+
+    def _compress_history_action(self) -> str:
+        history_text = self._format_history_for_summary()
+        if not history_text.strip():
+            return "No conversation history to compress."
+
+        prompt = f"""
+        Summarize the following conversation history between the user and the AI assistant, 
+        capturing the key context, active user requests, preferences, and state. 
+        Keep it extremely concise (under 200 words).
+        
+        History:
+        {history_text}
+        """
+        try:
+            response = self.gemini.generate_content(prompt)
+            summary = response.text.strip()
+        except Exception as e:
+            return f"Failed to generate summary: {str(e)}"
+
+        self.compressed_context = summary
+        self.db.set_state("compressed_context", summary)
+        self.db.clear_chat_history()
+        self._recreate_chat_session()
+        return summary
+
+    def _record_interaction(self, now=None):
+        if now is None:
+            now = time.time()
+        self.last_interaction_time = now
+        self.db.set_state("last_interaction_time", str(now))
+
+    def _clear_history_action(self) -> str:
+        self.compressed_context = ""
+        self.db.set_state("compressed_context", "")
+        self.db.clear_chat_history()
+        self._recreate_chat_session()
+        return "Conversation history completely cleared."
+
+    def _save_session_to_db(self):
+        try:
+            history = self.chat.get_history()
+        except Exception:
+            return
+
+        history_to_save = []
+        for item in history:
+            role = getattr(item, "role", "unknown")
+            text_parts = []
+            for part in getattr(item, "parts", []):
+                text = getattr(part, "text", None)
+                if text:
+                    text_parts.append(text)
+                elif getattr(part, "function_call", None):
+                    text_parts.append(f"[Tool call: {part.function_call.name}]")
+                elif getattr(part, "function_response", None):
+                    response = getattr(part.function_response, "response", "")
+                    text_parts.append(f"[Tool response: {response}]")
+            if text_parts:
+                history_to_save.append({"role": role, "text": "\n".join(text_parts)})
+
+        self.db.save_chat_history(history_to_save)
+
     def send_message(self, text):
         if not self.bot or not self.chat_id:
-            print("Telegram Bot Token or Chat ID not configured. Skipping send_message.")
+            print(
+                "Telegram Bot Token or Chat ID not configured. Skipping send_message."
+            )
             return {}
         try:
             res = self.bot.send_message(self.chat_id, text)
@@ -33,79 +153,69 @@ class TelegramBot:
             raise
 
     def handle_reply(self, reply_text):
-        # 1. Use Gemini to interpret intent and map to active recommendations
-        active_recs = self.db.get_recommendation_by_position(1) # Just checking if we have any
-        if not active_recs:
-            return "No active recommendations to act on."
+        # Check automatic 24-hour compression
+        now = time.time()
+        if (
+            self.last_interaction_time > 0
+            and (now - self.last_interaction_time) > 86400
+        ):
+            history_text = self._format_history_for_summary()
+            if history_text.strip():
+                try:
+                    self.send_message(
+                        "📦 Automatic 24-hour history compression triggered."
+                    )
+                except Exception:
+                    pass
+                self._compress_history_action()
 
-        prompt = f"""
-        The user said: "{reply_text}"
-        
-        Currently active recommendations:
-        {self._get_active_recs_summary()}
-        
-        Identify which item(s) the user wants to add or download. 
-        Return a JSON list of objects with 'tmdb_id', 'title', and 'type' (movie/tv).
-        If they don't want to add anything, return an empty list [].
-        """
-        
-        # Use simple flash model for quick interpretation
-        intent_response = self.gemini.generate_content(prompt).text.strip()
-        # Clean up JSON if LLM added backticks
-        json_str = intent_response
-        if "```json" in json_str:
-            json_str = json_str.split("```json")[1].split("```")[0].strip()
-        elif "```" in json_str:
-            json_str = json_str.split("```")[1].split("```")[0].strip()
-        
+        self._record_interaction(now)
+
         try:
-            items_to_add = json.loads(json_str)
-            results = []
-            for item in items_to_add:
-                if item['type'] == 'movie':
-                    res = self.radarr.add_movie(
-                        item['tmdb_id'], 
-                        Config.RADARR_ROOT_FOLDER, 
-                        Config.RADARR_QUALITY_PROFILE
-                    )
-                    results.append(f"Added Movie: {item['title']}")
-                elif item['type'] == 'tv':
-                    res = self.sonarr.add_series(
-                        item['tmdb_id'], 
-                        Config.SONARR_ROOT_FOLDER, 
-                        Config.SONARR_QUALITY_PROFILE
-                    )
-                    results.append(f"Added Series: {item['title']}")
-            
-            if results:
-                return "\n".join(results)
-            else:
-                if isinstance(items_to_add, list) and len(items_to_add) == 0:
-                    return "No recommended items were added to your library."
-                return "I couldn't figure out which item you meant. Could you be more specific?"
+            response = self.chat.send_message(reply_text)
+            self._save_session_to_db()
+            return response.text
         except Exception as e:
-            return f"Error processing request: {str(e)}"
-
-    def _get_active_recs_summary(self):
-        # Fetch all active recs from DB and format
-        with self.db._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT position, title, tmdb_id, media_type FROM active_recommendations")
-            rows = cursor.fetchall()
-            return "\n".join([f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows])
+            return f"An error occurred while communicating with Gemini: {str(e)}"
 
     def listen_loop(self):
         if not self.bot or not self.chat_id:
-            print("Telegram Bot Token or Chat ID not configured. Cannot start listen loop.")
+            print(
+                "Telegram Bot Token or Chat ID not configured. Cannot start listen loop."
+            )
             return
 
         print("Telegram listener started...")
-        
-        @self.bot.message_handler(func=lambda msg: str(msg.chat.id) == str(self.chat_id))
+
+        @self.bot.message_handler(
+            func=lambda msg: str(msg.chat.id) == str(self.chat_id)
+        )
         def message_received(message):
             text = message.text
             if text:
                 print(f"Received: {text}")
+
+                cleaned_text = text.strip()
+                if cleaned_text == "/clear":
+                    self._record_interaction()
+                    self._clear_history_action()
+                    try:
+                        self.bot.reply_to(
+                            message, "🧹 Chat history completely cleared and reset."
+                        )
+                    except Exception as e:
+                        print(f"Error replying: {e}")
+                    return
+                elif cleaned_text == "/compress":
+                    self._record_interaction()
+                    summary = self._compress_history_action()
+                    reply_msg = f"📦 Chat history compressed successfully!\n\n**Context Summary:**\n{summary}"
+                    try:
+                        self.bot.reply_to(message, reply_msg)
+                    except Exception as e:
+                        print(f"Error replying: {e}")
+                    return
+
                 response_text = self.handle_reply(text)
                 try:
                     self.bot.reply_to(message, response_text)
