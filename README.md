@@ -13,10 +13,13 @@ AI-driven media recommendation daemon for self-hosted stacks.
 If you are running Proxmox VE, you can use the automated installer. Run this command on your **Proxmox host**:
 
 ```bash
-# Using wget
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/lxc_install.sh)"
+# Using curl (recommended and standard on Proxmox)
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/lxc_install.sh)"
 
-# Or using GitHub CLI
+# Or using wget
+bash -c "$(wget -qO- https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/lxc_install.sh)"
+
+# Or using GitHub CLI (for private/authenticated access)
 bash -c "$(gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/lxc_install.sh)"
 ```
 
