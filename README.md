@@ -6,7 +6,12 @@ AI-driven media recommendation daemon for self-hosted stacks.
 - **Taste Profiler:** Analyzes Jellyfin history to understand what you like.
 - **Hybrid Discovery:** Finds new VOD/Digital releases on TMDB and filters against your existing library.
 - **AI Curation:** Uses Google Gemini with Google Search grounding to pick the best releases based on your profile.
-- **Telegram Integration:** Weekly recommendations sent via Telegram; supports natural language replies to add media to Radarr/Sonarr.
+- **Interactive Agentic Telegram Integration:** Weekly recommendations are sent via Telegram. Additionally, the bot is a fully conversational AI agent. You can chat with it to:
+  - **Request recommendations on-demand:** "Give me new recommendations" (forces fresh Jellyfin history profiling and TMDB discovery).
+  - **Discover by genre:** "What are some good recent comedy movies?" or "Show me scary TV series".
+  - **Ask for details:** "Tell me about Interstellar" or "What is the plot of Dune?".
+  - **Download specific media directly:** "Download Inception" or "Add Breaking Bad to my library".
+- **Resilient API Calls:** Automatic retry logic with real-time status updates posted directly in Telegram if API timeouts or rate limits occur (e.g., "⚠️ Rate limit or API error during adding movie. Retrying...").
 
 ## Proxmox LXC Installation
 

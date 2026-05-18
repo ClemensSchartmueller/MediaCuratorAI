@@ -3,8 +3,9 @@ from src.config import Config
 from src.database import Database
 from src.clients.radarr import RadarrClient
 from src.clients.sonarr import SonarrClient
+from src.clients.tmdb import TMDBClient
 from src.ai.gemini import GeminiClient
-import json
+from src.ai.agent_tools import create_tools
 
 class TelegramBot:
     def __init__(self):
@@ -13,7 +14,29 @@ class TelegramBot:
         self.db = Database()
         self.radarr = RadarrClient(Config.RADARR_URL, Config.RADARR_API_KEY)
         self.sonarr = SonarrClient(Config.SONARR_URL, Config.SONARR_API_KEY)
+        self.tmdb = TMDBClient(Config.TMDB_API_KEY)
         self.gemini = GeminiClient()
+        
+        # Instantiate standalone tool list using our factory
+        self.tools = create_tools(
+            tmdb=self.tmdb,
+            radarr=self.radarr,
+            sonarr=self.sonarr,
+            notify_fn=self.send_message
+        )
+        
+        # Initialize the persistent Gemini chat session with tools
+        system_instruction = (
+            "You are Media Curator AI, a highly agentic media assistant. "
+            "You have direct access to tools to download movies/series, get media information, "
+            "recommend media by genre, and generate weekly recommendation proposals. "
+            "Autonomously call the relevant tool when a user makes a request. "
+            "Always be polite, helpful, and concise in your natural language replies."
+        )
+        self.chat = self.gemini.create_chat_session(
+            tools=self.tools,
+            system_instruction=system_instruction
+        )
         
         if self.token:
             self.bot = telebot.TeleBot(self.token)
@@ -33,66 +56,11 @@ class TelegramBot:
             raise
 
     def handle_reply(self, reply_text):
-        # 1. Use Gemini to interpret intent and map to active recommendations
-        active_recs = self.db.get_recommendation_by_position(1) # Just checking if we have any
-        if not active_recs:
-            return "No active recommendations to act on."
-
-        prompt = f"""
-        The user said: "{reply_text}"
-        
-        Currently active recommendations:
-        {self._get_active_recs_summary()}
-        
-        Identify which item(s) the user wants to add or download. 
-        Return a JSON list of objects with 'tmdb_id', 'title', and 'type' (movie/tv).
-        If they don't want to add anything, return an empty list [].
-        """
-        
-        # Use simple flash model for quick interpretation
-        intent_response = self.gemini.generate_content(prompt).text.strip()
-        # Clean up JSON if LLM added backticks
-        json_str = intent_response
-        if "```json" in json_str:
-            json_str = json_str.split("```json")[1].split("```")[0].strip()
-        elif "```" in json_str:
-            json_str = json_str.split("```")[1].split("```")[0].strip()
-        
         try:
-            items_to_add = json.loads(json_str)
-            results = []
-            for item in items_to_add:
-                if item['type'] == 'movie':
-                    res = self.radarr.add_movie(
-                        item['tmdb_id'], 
-                        Config.RADARR_ROOT_FOLDER, 
-                        Config.RADARR_QUALITY_PROFILE
-                    )
-                    results.append(f"Added Movie: {item['title']}")
-                elif item['type'] == 'tv':
-                    res = self.sonarr.add_series(
-                        item['tmdb_id'], 
-                        Config.SONARR_ROOT_FOLDER, 
-                        Config.SONARR_QUALITY_PROFILE
-                    )
-                    results.append(f"Added Series: {item['title']}")
-            
-            if results:
-                return "\n".join(results)
-            else:
-                if isinstance(items_to_add, list) and len(items_to_add) == 0:
-                    return "No recommended items were added to your library."
-                return "I couldn't figure out which item you meant. Could you be more specific?"
+            response = self.chat.send_message(reply_text)
+            return response.text
         except Exception as e:
-            return f"Error processing request: {str(e)}"
-
-    def _get_active_recs_summary(self):
-        # Fetch all active recs from DB and format
-        with self.db._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT position, title, tmdb_id, media_type FROM active_recommendations")
-            rows = cursor.fetchall()
-            return "\n".join([f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows])
+            return f"An error occurred while communicating with Gemini: {str(e)}"
 
     def listen_loop(self):
         if not self.bot or not self.chat_id:
