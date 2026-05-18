@@ -31,8 +31,9 @@ EOF
 
 # --- Hooks & Overrides ---
 
-# This function is called by the standard install_script -> build_container -> lxc_provision
-# We override it to handle our private repository setup
+# This function handles the private repository setup inside the newly created container.
+# It is called explicitly after the container is built, since build_container in the 
+# standard build.func runs an installer script for official community apps, which 404s for us.
 function lxc_provision() {
   msg_info "Running Application Setup"
   
@@ -42,11 +43,48 @@ function lxc_provision() {
       GH_TOKEN_VAL=$(gh auth token 2>/dev/null || true)
   fi
 
-  # Run app_setup.sh inside the container
+  # Create a temporary file on the host to store the script
+  TEMP_SCRIPT=$(mktemp)
+  
+  # Fetch app_setup.sh
   if [[ -n "$GH_TOKEN_VAL" ]]; then
-      (echo "export GH_TOKEN=\"$GH_TOKEN_VAL\""; gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh) | pct exec "$CTID" -- bash
+      msg_info "Fetching app_setup.sh using GitHub CLI (private/authenticated path)..."
+      gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh > "$TEMP_SCRIPT" 2>/dev/null || true
+  fi
+  
+  # Fallback to curl if gh was not run or failed to fetch
+  if [[ ! -s "$TEMP_SCRIPT" ]]; then
+      msg_info "Fetching app_setup.sh using curl (public path)..."
+      curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh > "$TEMP_SCRIPT" 2>/dev/null || true
+  fi
+
+  # Check if we successfully fetched the script
+  if [[ ! -s "$TEMP_SCRIPT" ]]; then
+      msg_error "Failed to retrieve app_setup.sh! Cannot provision the application."
+      rm -f "$TEMP_SCRIPT"
+      exit 1
+  fi
+
+  # Push the script into the container, make it executable, and run it
+  msg_info "Pushing and executing setup script inside the container..."
+  pct push "$CTID" "$TEMP_SCRIPT" /tmp/app_setup.sh
+  pct exec "$CTID" -- chmod +x /tmp/app_setup.sh
+  
+  # Execute with GH_TOKEN if available so the container can clone/pull
+  local exit_code=0
+  if [[ -n "$GH_TOKEN_VAL" ]]; then
+      pct exec "$CTID" -- env GH_TOKEN="$GH_TOKEN_VAL" /tmp/app_setup.sh || exit_code=$?
   else
-      curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | pct exec "$CTID" -- bash
+      pct exec "$CTID" -- /tmp/app_setup.sh || exit_code=$?
+  fi
+
+  # Cleanup inside container and host
+  pct exec "$CTID" -- rm -f /tmp/app_setup.sh
+  rm -f "$TEMP_SCRIPT"
+
+  if [[ $exit_code -ne 0 ]]; then
+      msg_error "Application setup failed inside the container with exit code $exit_code!"
+      exit $exit_code
   fi
   
   msg_ok "Completed Application Setup"
@@ -66,11 +104,40 @@ function update_script() {
         GH_TOKEN_VAL=$(gh auth token 2>/dev/null || true)
     fi
 
+    TEMP_SCRIPT=$(mktemp)
+
+    # Fetch app_setup.sh
     if [[ -n "$GH_TOKEN_VAL" ]]; then
-        (echo "export GH_TOKEN=\"$GH_TOKEN_VAL\""; gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh) | bash
-    else
-        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh | bash
+        gh api -H "Accept: application/vnd.github.raw" /repos/ClemensSchartmueller/MediaCuratorAI/contents/proxmox/app_setup.sh > "$TEMP_SCRIPT" 2>/dev/null || true
     fi
+    
+    if [[ ! -s "$TEMP_SCRIPT" ]]; then
+        curl -fsSL https://raw.githubusercontent.com/ClemensSchartmueller/MediaCuratorAI/main/proxmox/app_setup.sh > "$TEMP_SCRIPT" 2>/dev/null || true
+    fi
+
+    # Check if we successfully fetched the script
+    if [[ ! -s "$TEMP_SCRIPT" ]]; then
+        msg_error "Failed to retrieve app_setup.sh! Cannot update the application."
+        rm -f "$TEMP_SCRIPT"
+        exit 1
+    fi
+
+    # Make executable and run inside container
+    chmod +x "$TEMP_SCRIPT"
+    local exit_code=0
+    if [[ -n "$GH_TOKEN_VAL" ]]; then
+        env GH_TOKEN="$GH_TOKEN_VAL" "$TEMP_SCRIPT" || exit_code=$?
+    else
+        "$TEMP_SCRIPT" || exit_code=$?
+    fi
+
+    rm -f "$TEMP_SCRIPT"
+
+    if [[ $exit_code -ne 0 ]]; then
+        msg_error "Application update failed with exit code $exit_code!"
+        exit $exit_code
+    fi
+
     msg_ok "Updated ${APP}"
     exit
 }
@@ -86,6 +153,11 @@ catch_errors
 # Standard start() will call install_script() which now uses the robust community flow
 start
 build_container
+
+# 3. Explicitly execute our custom provision function (since build.func installation 404s for custom apps)
+lxc_provision
+
+# 4. Display installation summary and next steps
 description
 
 msg_ok "Completed Successfully"

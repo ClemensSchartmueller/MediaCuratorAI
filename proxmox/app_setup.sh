@@ -11,7 +11,8 @@ REPO_URL="https://github.com/ClemensSchartmueller/MediaCuratorAI.git"
 
 echo "Updating container OS..."
 apt-get update && apt-get upgrade -y
-apt-get install -y python3 python3-venv git curl sqlite3
+# Added python3-pip to ensure virtual environments can bootstrap pip without ensurepip errors on Debian
+apt-get install -y python3 python3-venv python3-pip git curl sqlite3
 
 # Install GitHub CLI if GH_TOKEN is provided and gh is not installed
 if [[ -n "$GH_TOKEN" ]] && ! command -v gh &> /dev/null; then
@@ -34,7 +35,7 @@ fi
 
 echo "Cloning Media Curator..."
 if command -v gh &> /dev/null; then
-    gh repo clone ClemensSchartmueller/MediaCuratorAI $APP_DIR || (cd $APP_DIR && gh repo sync)
+    gh repo clone ClemensSchartmueller/MediaCuratorAI $APP_DIR || (cd $APP_DIR && git pull)
 else
     # Fallback to git with token if available
     if [[ -n "$GH_TOKEN" ]]; then
@@ -64,6 +65,10 @@ cp deployment/media-curator-discovery.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now media-curator.service
 systemctl enable --now media-curator-discovery.timer
+
+# Restart the daemon service to ensure any newly pulled python code is loaded
+echo "Restarting service to apply updates..."
+systemctl restart media-curator.service
 
 echo "Setup complete!"
 echo "Next steps:"
