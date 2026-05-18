@@ -18,9 +18,8 @@ class Config:
 
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-    SIGNAL_URL = os.getenv("SIGNAL_URL")
-    SIGNAL_NUMBER = os.getenv("SIGNAL_NUMBER")
-    SIGNAL_RECIPIENT = os.getenv("SIGNAL_RECIPIENT")
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
     RADARR_ROOT_FOLDER = os.getenv("RADARR_ROOT_FOLDER", "/data/media/movies")
     RADARR_QUALITY_PROFILE = int(os.getenv("RADARR_QUALITY_PROFILE", "1"))

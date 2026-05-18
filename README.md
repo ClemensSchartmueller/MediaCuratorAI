@@ -6,7 +6,7 @@ AI-driven media recommendation daemon for self-hosted stacks.
 - **Taste Profiler:** Analyzes Jellyfin history to understand what you like.
 - **Hybrid Discovery:** Finds new VOD/Digital releases on TMDB and filters against your existing library.
 - **AI Curation:** Uses Google Gemini with Google Search grounding to pick the best releases based on your profile.
-- **Signal Integration:** Weekly recommendations sent via Signal; supports natural language replies to add media to Radarr/Sonarr.
+- **Telegram Integration:** Weekly recommendations sent via Telegram; supports natural language replies to add media to Radarr/Sonarr.
 
 ## Proxmox LXC Installation
 
@@ -48,6 +48,13 @@ bash proxmox/lxc_install.sh
 
 2. **Configure:**
    Copy `.env.example` to `.env` and fill in your API keys and URLs.
+   
+   **Setting up Telegram Bot:**
+   1. Open Telegram and search for [@BotFather](https://t.me/BotFather).
+   2. Send `/newbot` and follow the instructions to create a bot. Copy the bot token provided.
+   3. Search for your bot in Telegram and start a chat by clicking **Start** or sending a message.
+   4. Search for [@userinfobot](https://t.me/userinfobot) and message it to find your Telegram Chat ID, or visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` to find the chat ID from the message you sent to your bot.
+   5. Put these values in your `.env` file under `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
 
 3. **Database Setup:**
    The database will be initialized on the first run.
@@ -80,4 +87,4 @@ If using cron:
 - Radarr/Sonarr/Jellyfin
 - TMDB API Key
 - Google Gemini API Key
-- [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) running
+- Telegram Bot Token & Chat ID

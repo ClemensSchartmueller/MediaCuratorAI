@@ -2,7 +2,7 @@ import argparse
 import sys
 from src.ai.profiler import Profiler
 from src.ai.discovery import DiscoveryPipeline
-from src.signals.bot import SignalBot
+from src.telegram.bot import TelegramBot
 from src.database import Database
 import json
 import re
@@ -17,7 +17,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Media Curator AI")
     parser.add_argument("command", choices=["profile", "discover", "listen"], help="Command to run")
-    parser.add_argument("--no-signal", action="store_true", help="Print output to CLI instead of sending via Signal (for testing)")
+    parser.add_argument("--no-telegram", action="store_true", help="Print output to CLI instead of sending via Telegram (for testing)")
     args = parser.parse_args()
 
     if args.command == "profile":
@@ -35,7 +35,7 @@ def main():
             db = Database()
             db.set_active_recommendations(recs)
             
-            # Format message for Signal
+            # Format message for Telegram
             message = "🎬 Weekly Media Recommendations 🎬\n\n"
             for rec in recs:
                 icon = "🎥" if rec['media_type'] == "movie" else "📺"
@@ -44,21 +44,21 @@ def main():
             
             message += "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
             
-            if args.no_signal:
-                print("\n--- TEST OUTPUT (No Signal) ---")
+            if args.no_telegram:
+                print("\n--- TEST OUTPUT (No Telegram) ---")
                 print(message)
                 print("-------------------------------\n")
             else:
-                # Send to Signal
-                bot = SignalBot()
+                # Send to Telegram
+                bot = TelegramBot()
                 bot.send_message(message)
-                print("Recommendations sent via Signal.")
+                print("Recommendations sent via Telegram.")
         except Exception as e:
             print(f"Error during discovery: {e}")
 
     elif args.command == "listen":
-        print("Starting Signal Listener...")
-        bot = SignalBot()
+        print("Starting Telegram Listener...")
+        bot = TelegramBot()
         bot.listen_loop()
 
 if __name__ == "__main__":

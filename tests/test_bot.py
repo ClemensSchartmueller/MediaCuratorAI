@@ -1,14 +1,14 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from src.signals.bot import SignalBot
+from src.telegram.bot import TelegramBot
 
-class TestSignalBot(unittest.TestCase):
-    @patch('src.signals.bot.GeminiClient')
-    @patch('src.signals.bot.SonarrClient')
-    @patch('src.signals.bot.RadarrClient')
-    @patch('src.signals.bot.Database')
-    @patch('src.signals.bot.requests')
-    def test_handle_reply_movie(self, mock_requests, MockDB, MockRadarr, MockSonarr, MockGemini):
+class TestTelegramBot(unittest.TestCase):
+    @patch('src.telegram.bot.GeminiClient')
+    @patch('src.telegram.bot.SonarrClient')
+    @patch('src.telegram.bot.RadarrClient')
+    @patch('src.telegram.bot.Database')
+    @patch('src.telegram.bot.telebot')
+    def test_handle_reply_movie(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockGemini):
         mock_db = MockDB.return_value
         mock_db.get_recommendation_by_position.return_value = {"id": 1}
         
@@ -20,10 +20,9 @@ class TestSignalBot(unittest.TestCase):
         
         mock_radarr_instance = MockRadarr.return_value
         
-        bot = SignalBot()
-        bot.url = "http://mock-signal"
-        bot.number = "+1"
-        bot.recipient = "+2"
+        bot = TelegramBot()
+        bot.token = "mock-token"
+        bot.chat_id = "12345"
         
         # Mock summary to avoid DB fetch error inside _get_active_recs_summary
         bot._get_active_recs_summary = MagicMock(return_value="1. New Movie (TMDB: 4, Type: movie)")
@@ -33,16 +32,16 @@ class TestSignalBot(unittest.TestCase):
         self.assertIn("Added Movie: New Movie", response)
         mock_radarr_instance.add_movie.assert_called_once()
 
-    @patch('src.signals.bot.GeminiClient')
-    @patch('src.signals.bot.SonarrClient')
-    @patch('src.signals.bot.RadarrClient')
-    @patch('src.signals.bot.Database')
-    @patch('src.signals.bot.requests')
-    def test_handle_reply_no_recs(self, mock_requests, MockDB, MockRadarr, MockSonarr, MockGemini):
+    @patch('src.telegram.bot.GeminiClient')
+    @patch('src.telegram.bot.SonarrClient')
+    @patch('src.telegram.bot.RadarrClient')
+    @patch('src.telegram.bot.Database')
+    @patch('src.telegram.bot.telebot')
+    def test_handle_reply_no_recs(self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockGemini):
         mock_db = MockDB.return_value
         mock_db.get_recommendation_by_position.return_value = None # No active recs
         
-        bot = SignalBot()
+        bot = TelegramBot()
         response = bot.handle_reply("Add New Movie")
         
         self.assertEqual(response, "No active recommendations to act on.")

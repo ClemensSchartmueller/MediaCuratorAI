@@ -33,9 +33,8 @@ RADARR_URL=http://localhost:7878
 RADARR_API_KEY=dummy_key
 TMDB_API_KEY=dummy_key
 GEMINI_API_KEY=$GEMINI_KEY
-SIGNAL_URL=http://localhost:8080
-SIGNAL_NUMBER=+10000000000
-SIGNAL_RECIPIENT=+10000000000
+TELEGRAM_BOT_TOKEN=dummy_token
+TELEGRAM_CHAT_ID=123456789
 EOF
 fi
 
@@ -68,5 +67,5 @@ python3 -m unittest discover tests
 
 echo -e "\n\e[32m--- Setup Complete ---\e[0m"
 echo "You can now run the app in test mode using:"
-echo -e "\e[90mpython3 main.py discover --no-signal\e[0m"
+echo -e "\e[90mpython3 main.py discover --no-telegram\e[0m"
 echo -e "Or use the Makefile: \e[90mmake test\e[0m"

@@ -6,7 +6,7 @@
   - In temporary agent VMs (like Jules), use the system python after running `bash setup_jules.sh`.
 - **Testing:** 
   - Always run tests using `make test` or `python3 -m unittest discover tests` before considering a task complete.
-  - Use `python3 main.py discover --no-signal` to verify discovery logic without external side effects.
+  - Use `python3 main.py discover --no-telegram` to verify discovery logic without external side effects.
 - **Development Tools:** 
   - Utilize `make lint` and `make format` to maintain code standards.
   - Ensure `requirements-dev.txt` is installed for all development tasks.

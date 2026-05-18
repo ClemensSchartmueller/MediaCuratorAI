@@ -13,4 +13,4 @@ format:
 	black src tests
 
 run-test-discovery:
-	python3 main.py discover --no-signal
+	python3 main.py discover --no-telegram

@@ -8,7 +8,7 @@ class GeminiClient:
         self.model_id = 'gemini-flash-latest'
 
     def generate_content(self, prompt, config=None):
-        """Wrapper for simple content generation used by the Signal bot."""
+        """Wrapper for simple content generation used by the Telegram bot."""
         return self.client.models.generate_content(
             model=self.model_id,
             contents=prompt,

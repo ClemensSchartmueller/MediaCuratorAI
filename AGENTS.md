@@ -19,9 +19,9 @@ This script handles:
   - `make test`: Run all unit tests.
   - `make lint`: Check code style.
   - `make format`: Auto-format code.
-  - `make run-test-discovery`: Run the discovery pipeline without sending Signal messages.
+  - `make run-test-discovery`: Run the discovery pipeline without sending Telegram messages.
 - For testing implementation changes, always use `python3 -m unittest discover tests`.
-- For manual verification of discovery logic, use `python3 main.py discover --no-signal`.
+- For manual verification of discovery logic, use `python3 main.py discover --no-telegram`.
 
 ---
 

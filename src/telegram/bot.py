@@ -1,38 +1,36 @@
-import requests
+import telebot
 from src.config import Config
 from src.database import Database
 from src.clients.radarr import RadarrClient
 from src.clients.sonarr import SonarrClient
 from src.ai.gemini import GeminiClient
-import time
 import json
 
-class SignalBot:
+class TelegramBot:
     def __init__(self):
-        self.url = Config.SIGNAL_URL.rstrip("/")
-        self.number = Config.SIGNAL_NUMBER
-        self.recipient = Config.SIGNAL_RECIPIENT
+        self.token = Config.TELEGRAM_BOT_TOKEN
+        self.chat_id = Config.TELEGRAM_CHAT_ID
         self.db = Database()
         self.radarr = RadarrClient(Config.RADARR_URL, Config.RADARR_API_KEY)
         self.sonarr = SonarrClient(Config.SONARR_URL, Config.SONARR_API_KEY)
         self.gemini = GeminiClient()
+        
+        if self.token:
+            self.bot = telebot.TeleBot(self.token)
+        else:
+            self.bot = None
 
     def send_message(self, text):
-        payload = {
-            "message": text,
-            "number": self.number,
-            "recipients": [self.recipient]
-        }
-        response = requests.post(f"{self.url}/v2/send", json=payload)
-        response.raise_for_status()
-        return response.json()
-
-    def receive_messages(self):
-        # Long polling or frequent polling of the receive endpoint
-        response = requests.get(f"{self.url}/v1/receive/{self.number}")
-        if response.status_code == 200:
-            return response.json()
-        return []
+        if not self.bot or not self.chat_id:
+            print("Telegram Bot Token or Chat ID not configured. Skipping send_message.")
+            return {}
+        try:
+            res = self.bot.send_message(self.chat_id, text)
+            # Return the message dict for mock compatibility in test suite
+            return res.json if hasattr(res, "json") else {}
+        except Exception as e:
+            print(f"Error sending message via Telegram: {e}")
+            raise
 
     def handle_reply(self, reply_text):
         # 1. Use Gemini to interpret intent and map to active recommendations
@@ -97,21 +95,22 @@ class SignalBot:
             return "\n".join([f"{r[0]}. {r[1]} (TMDB: {r[2]}, Type: {r[3]})" for r in rows])
 
     def listen_loop(self):
-        print("Signal listener started...")
-        while True:
-            try:
-                messages = self.receive_messages()
-                for msg in messages:
-                    # Filter for messages from our recipient
-                    envelope = msg.get('envelope', {})
-                    source = envelope.get('source')
-                    data_msg = envelope.get('dataMessage', {})
-                    text = data_msg.get('message')
-                    
-                    if source == self.recipient and text:
-                        print(f"Received: {text}")
-                        response_text = self.handle_reply(text)
-                        self.send_message(response_text)
-            except Exception as e:
-                print(f"Error in listen loop: {e}")
-            time.sleep(5) # Poll every 5 seconds
+        if not self.bot or not self.chat_id:
+            print("Telegram Bot Token or Chat ID not configured. Cannot start listen loop.")
+            return
+
+        print("Telegram listener started...")
+        
+        @self.bot.message_handler(func=lambda msg: str(msg.chat.id) == str(self.chat_id))
+        def message_received(message):
+            text = message.text
+            if text:
+                print(f"Received: {text}")
+                response_text = self.handle_reply(text)
+                try:
+                    self.bot.reply_to(message, response_text)
+                except Exception as e:
+                    print(f"Error replying to message: {e}")
+
+        # Starts clean polling optimized for LXC environment (low CPU/memory usage, auto-reconnects on drop)
+        self.bot.infinity_polling(timeout=20, long_polling_timeout=20)

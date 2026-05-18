@@ -1,5 +1,5 @@
 [Unit]
-Description=Media Curator Signal Listener
+Description=Media Curator Telegram Listener
 After=network.target
 
 [Service]
