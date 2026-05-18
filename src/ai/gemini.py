@@ -54,3 +54,15 @@ class GeminiClient:
             )
         )
         return response.text.strip()
+
+    def create_chat_session(self, tools=None, system_instruction=None):
+        """Creates a stateful conversational chat session with auto-function calling enabled."""
+        config_kwargs = {}
+        if tools:
+            config_kwargs['tools'] = tools
+        if system_instruction:
+            config_kwargs['system_instruction'] = system_instruction
+            
+        config = types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
+        return self.client.chats.create(model=self.model_id, config=config)
+

@@ -55,3 +55,28 @@ class TMDBClient(BaseClient):
             "first_air_date.lte": today.strftime("%Y-%m-%d")
         }
         return self._get("/discover/tv", params=params)
+
+    def search_multi(self, query):
+        """Searches for movies, TV shows, and people based on a query string."""
+        return self._get("/search/multi", params={"query": query})
+
+    def get_movie_details(self, movie_id):
+        """Fetches detailed information for a specific movie ID."""
+        return self._get(f"/movie/{movie_id}")
+
+    def get_tv_details(self, tv_id):
+        """Fetches detailed information for a specific TV show ID."""
+        return self._get(f"/tv/{tv_id}")
+
+    def get_genres(self, media_type):
+        """Gets the list of official TMDB genres for 'movie' or 'tv'."""
+        return self._get(f"/genre/{media_type}/list")
+
+    def discover_by_genre(self, genre_id, media_type):
+        """Discovers popular movies or TV shows belonging to a specific genre ID."""
+        return self._get(f"/discover/{media_type}", params={
+            "with_genres": genre_id,
+            "sort_by": "popularity.desc",
+            "page": 1
+        })
+
