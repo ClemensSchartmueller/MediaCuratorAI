@@ -37,6 +37,28 @@ Alternatively, if you have the repo cloned locally on the host:
 bash proxmox/lxc_install.sh
 ```
 
+### Updating the LXC Container
+
+The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mechanisms for both the application and the container operating system:
+
+1. **Manual Application Updates**:
+   Type `update` in the LXC container's console to update the application to the latest version:
+   ```bash
+   update
+   ```
+
+2. **Automated / Multi-Container Application Updates**:
+   Use the community's `update-apps.sh` script on your **Proxmox Host** to automatically update all managed LXC containers (including Media Curator):
+   ```bash
+   bash -c "$(curl -fsSL https://github.com/community-scripts/ProxmoxVE/raw/main/tools/update-apps.sh)"
+   ```
+
+3. **Container Operating System Updates**:
+   Use the PVE LXC Updater (`update-lxcs.sh`) on your **Proxmox Host** to upgrade the container operating system packages (unattended/dist-upgrade):
+   ```bash
+   bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-lxcs.sh)"
+   ```
+
 ---
 
 ## Manual Setup (LXC or Linux)
