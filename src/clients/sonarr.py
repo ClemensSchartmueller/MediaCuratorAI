@@ -9,7 +9,6 @@ class SonarrClient(BaseClient):
         # Sonarr uses TVDB ID usually, but we can look up via TMDB if needed
         # TMDB discovery gives us TMDB ID. Sonarr lookup supports tmdb:
         series_info = self._get("/api/v3/series/lookup", params={"term": f"tmdb:{tmdb_id}"})[0]
-        
         # Pre-check if series is already in the library to avoid 400 Bad Request
         try:
             existing_series = self.get_series()
@@ -20,6 +19,8 @@ class SonarrClient(BaseClient):
                     raise MediaAlreadyExistsError(
                         "series", series_info.get("title"), "Sonarr"
                     )
+        except MediaAlreadyExistsError:
+            raise
         except Exception as e:
             print(f"Warning: Failed to check for duplicate series in Sonarr: {str(e)}")
 
