@@ -61,6 +61,20 @@ class TMDBClient(BaseClient):
         """Searches for movies, TV shows, and people based on a query string."""
         return self._get("/search/multi", params={"query": query})
 
+    def search_movie(self, query, year=None):
+        """Searches specifically for movies. Supports optional year filtering."""
+        params = {"query": query}
+        if year:
+            params["year"] = year
+        return self._get("/search/movie", params=params)
+
+    def search_tv(self, query, year=None):
+        """Searches specifically for TV shows. Supports optional year filtering."""
+        params = {"query": query}
+        if year:
+            params["first_air_date_year"] = year
+        return self._get("/search/tv", params=params)
+
     def get_movie_details(self, movie_id):
         """Fetches detailed information for a specific movie ID."""
         return self._get(f"/movie/{movie_id}")

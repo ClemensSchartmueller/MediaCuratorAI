@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import time
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from src.telegram.bot import TelegramBot
-from src.ai.agent_tools import create_tools, _is_retryable_error
+from src.ai.agent_tools import create_tools, _is_retryable_error, _parse_title_and_year
 from src.clients.exceptions import MediaAlreadyExistsError
 
 
@@ -647,6 +647,98 @@ class TestAgentTools(unittest.TestCase):
         res = compress_history()
         self.assertEqual(res, "Compressed")
         self.mock_bot._compress_history_action.assert_called_once()
+
+
+class TestParseTitleAndYear(unittest.TestCase):
+    def test_title_with_year(self):
+        clean, year = _parse_title_and_year("Dune (2021)")
+        self.assertEqual(clean, "Dune")
+        self.assertEqual(year, 2021)
+
+    def test_title_without_year(self):
+        clean, year = _parse_title_and_year("Dune")
+        self.assertEqual(clean, "Dune")
+        self.assertIsNone(year)
+
+    def test_title_with_year_and_extra_spaces(self):
+        clean, year = _parse_title_and_year("  Blade Runner 2049  (1996)  ")
+        self.assertEqual(clean, "Blade Runner 2049")
+        self.assertEqual(year, 1996)
+
+    def test_title_year_not_at_end_is_ignored(self):
+        """A year in the middle of the title should not be extracted."""
+        clean, year = _parse_title_and_year("2001: A Space Odyssey")
+        self.assertEqual(clean, "2001: A Space Odyssey")
+        self.assertIsNone(year)
+
+
+class TestYearAwareSearch(unittest.TestCase):
+    def setUp(self):
+        self.mock_tmdb = MagicMock()
+        self.mock_radarr = MagicMock()
+        self.mock_sonarr = MagicMock()
+        self.mock_bot = MagicMock()
+
+        self.tools = create_tools(
+            self.mock_tmdb, self.mock_radarr, self.mock_sonarr, self.mock_bot
+        )
+        self.tools_dict = {t.__name__: t for t in self.tools}
+
+    def test_add_movie_with_year_uses_search_movie(self):
+        """When a year is provided, search_movie is called instead of search_multi."""
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_movie.return_value = {
+            "results": [{"id": 10, "title": "Sabrina", "release_date": "1996-01-01"}]
+        }
+
+        res = add_movie("Sabrina (1996)")
+        self.assertIn("Successfully added movie 'Sabrina'", res)
+        self.mock_tmdb.search_movie.assert_called_once_with("Sabrina", year=1996)
+        self.mock_tmdb.search_multi.assert_not_called()
+
+    def test_add_movie_without_year_uses_search_multi(self):
+        """Without a year, the original search_multi path is used."""
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_multi.return_value = {
+            "results": [{"media_type": "movie", "id": 10, "title": "Sabrina"}]
+        }
+
+        res = add_movie("Sabrina")
+        self.assertIn("Successfully added movie 'Sabrina'", res)
+        self.mock_tmdb.search_multi.assert_called_once_with("Sabrina")
+        self.mock_tmdb.search_movie.assert_not_called()
+
+    def test_add_series_with_year_uses_search_tv(self):
+        """When a year is provided, search_tv is called instead of search_multi."""
+        add_series = self.tools_dict["add_series_to_library"]
+        self.mock_tmdb.search_tv.return_value = {
+            "results": [{"id": 20, "name": "Shogun", "first_air_date": "1980-09-15"}]
+        }
+
+        res = add_series("Shogun (1980)")
+        self.assertIn("Successfully added series 'Shogun'", res)
+        self.mock_tmdb.search_tv.assert_called_once_with("Shogun", year=1980)
+        self.mock_tmdb.search_multi.assert_not_called()
+
+    def test_add_series_without_year_uses_search_multi(self):
+        """Without a year, the original search_multi path is used."""
+        add_series = self.tools_dict["add_series_to_library"]
+        self.mock_tmdb.search_multi.return_value = {
+            "results": [{"media_type": "tv", "id": 20, "name": "Shogun"}]
+        }
+
+        res = add_series("Shogun")
+        self.assertIn("Successfully added series 'Shogun'", res)
+        self.mock_tmdb.search_multi.assert_called_once_with("Shogun")
+        self.mock_tmdb.search_tv.assert_not_called()
+
+    def test_add_movie_with_year_not_found(self):
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_movie.return_value = {"results": []}
+
+        res = add_movie("Ghost (2026)")
+        self.assertIn("Could not find any movie matching 'Ghost (2026)'", res)
+        self.mock_radarr.add_movie.assert_not_called()
 
 
 if __name__ == "__main__":

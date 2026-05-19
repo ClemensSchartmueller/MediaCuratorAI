@@ -1,3 +1,4 @@
+import re
 import time
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from src.ai.profiler import Profiler
@@ -5,6 +6,18 @@ from src.ai.discovery import DiscoveryPipeline
 from src.clients.exceptions import MediaAlreadyExistsError
 from src.database import Database
 from src.config import Config
+
+
+def _parse_title_and_year(title: str):
+    """Extracts a trailing year in parentheses from a title string.
+
+    Returns a tuple (clean_title, year) where year is an int or None.
+    Example: 'Dune (2021)' -> ('Dune', 2021)
+    """
+    match = re.search(r"^(.+?)\s*\((\d{4})\)\s*$", title.strip())
+    if match:
+        return match.group(1).strip(), int(match.group(2))
+    return title.strip(), None
 
 
 def _is_retryable_error(error):
@@ -47,10 +60,18 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
         """Searches TMDB for the movie and adds it via Radarr. Use this when the user explicitly wants to download or add a movie."""
 
         def action():
-            results = tmdb.search_multi(title)
-            movies = [
-                r for r in results.get("results", []) if r.get("media_type") == "movie"
-            ]
+            clean_title, year = _parse_title_and_year(title)
+            if year:
+                results = tmdb.search_movie(clean_title, year=year)
+                movies = results.get("results", [])
+                # Tag results with media_type so downstream logic stays consistent
+                for m in movies:
+                    m.setdefault("media_type", "movie")
+            else:
+                results = tmdb.search_multi(clean_title)
+                movies = [
+                    r for r in results.get("results", []) if r.get("media_type") == "movie"
+                ]
             if not movies:
                 return f"Could not find any movie matching '{title}'."
             if len(movies) > 1:
@@ -87,10 +108,17 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
         """Searches TMDB for the series and adds it via Sonarr. Use this when the user explicitly wants to download or add a TV show/series."""
 
         def action():
-            results = tmdb.search_multi(title)
-            series = [
-                r for r in results.get("results", []) if r.get("media_type") == "tv"
-            ]
+            clean_title, year = _parse_title_and_year(title)
+            if year:
+                results = tmdb.search_tv(clean_title, year=year)
+                series = results.get("results", [])
+                for s in series:
+                    s.setdefault("media_type", "tv")
+            else:
+                results = tmdb.search_multi(clean_title)
+                series = [
+                    r for r in results.get("results", []) if r.get("media_type") == "tv"
+                ]
             if not series:
                 return f"Could not find any TV series matching '{title}'."
             if len(series) > 1:
