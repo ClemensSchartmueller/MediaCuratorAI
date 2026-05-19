@@ -111,20 +111,41 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
    ```
 
 5. **Deployment (LXC):**
-   - Copy `deployment/media-curator.service` to `/etc/systemd/system/`.
-   - Copy `deployment/media-curator-discovery.service` and `deployment/media-curator-discovery.timer` to `/etc/systemd/system/`.
-   - `systemctl daemon-reload`
-   - `systemctl enable --now media-curator.service`
-   - `systemctl enable --now media-curator-discovery.timer`
+   Copy the service files and generate the timer from your `.env` schedule in one step:
+   ```bash
+   cp deployment/media-curator.service /etc/systemd/system/
+   cp deployment/media-curator-discovery.service /etc/systemd/system/
+   DISCOVERY_SCHEDULE=$(grep -E '^DISCOVERY_SCHEDULE=' .env | cut -d '=' -f2- | tr -d '"')
+   DISCOVERY_SCHEDULE="${DISCOVERY_SCHEDULE:-Thu 17:00:00}"
+   sed "s|OnCalendar=.*|OnCalendar=${DISCOVERY_SCHEDULE}|" deployment/media-curator-discovery.timer > /etc/systemd/system/media-curator-discovery.timer
+   systemctl daemon-reload
+   systemctl enable --now media-curator.service
+   systemctl enable --now media-curator-discovery.timer
+   ```
 
 ## Scheduling
-You can use the provided systemd timer (recommended for LXC) or traditional cron.
-If using cron:
-```cron
-# Weekly discovery (Sundays at 10 AM)
-0 10 * * 0 cd /opt/media-curator && ./venv/bin/python main.py discover
 
-# Monthly profile refresh (1st of every month)
+The discovery timer schedule is configured via `DISCOVERY_SCHEDULE` in your `.env` file using systemd's `OnCalendar` format:
+
+```env
+# Run every Thursday at 5 PM
+DISCOVERY_SCHEDULE=Thu 17:00:00
+
+# Other examples:
+# DISCOVERY_SCHEDULE=Fri 08:00:00   # Every Friday at 8 AM
+# DISCOVERY_SCHEDULE=weekly          # systemd default (Monday midnight)
+```
+
+**Applying a schedule change** (LXC Proxmox installation):
+1. Edit `DISCOVERY_SCHEDULE` in `/opt/media-curator/.env`.
+2. Run `update` inside the container (or `pct exec <CTID> -- update` from the host).
+
+If you prefer cron instead of systemd:
+```cron
+# Weekly discovery (Thursdays at 5 PM)
+0 17 * * 4 cd /opt/media-curator && ./venv/bin/python main.py discover
+
+# Monthly profile refresh (1st of every month at 2 AM)
 0 2 1 * * cd /opt/media-curator && ./venv/bin/python main.py profile
 ```
 

@@ -61,7 +61,22 @@ fi
 echo "Installing systemd services..."
 cp deployment/media-curator.service /etc/systemd/system/
 cp deployment/media-curator-discovery.service /etc/systemd/system/
-cp deployment/media-curator-discovery.timer /etc/systemd/system/
+
+# Generate the timer file from the schedule in .env (DISCOVERY_SCHEDULE), defaulting to Thu 17:00:00
+DISCOVERY_SCHEDULE=$(grep -E '^DISCOVERY_SCHEDULE=' .env 2>/dev/null | cut -d '=' -f2- | tr -d '"\r\n')
+DISCOVERY_SCHEDULE="${DISCOVERY_SCHEDULE:-Thu 17:00:00}"
+echo "Configuring discovery timer: OnCalendar=${DISCOVERY_SCHEDULE}"
+cat > /etc/systemd/system/media-curator-discovery.timer << TIMER_EOF
+[Unit]
+Description=Run Media Curator Weekly Discovery
+
+[Timer]
+OnCalendar=${DISCOVERY_SCHEDULE}
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER_EOF
 
 systemctl daemon-reload
 systemctl enable --now media-curator.service
