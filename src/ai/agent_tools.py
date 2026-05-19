@@ -1,4 +1,3 @@
-import re
 import time
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from src.ai.profiler import Profiler
@@ -6,18 +5,6 @@ from src.ai.discovery import DiscoveryPipeline
 from src.clients.exceptions import MediaAlreadyExistsError
 from src.database import Database
 from src.config import Config
-
-
-def _parse_title_and_year(title: str):
-    """Extracts a trailing year in parentheses from a title string.
-
-    Returns a tuple (clean_title, year) where year is an int or None.
-    Example: 'Dune (2021)' -> ('Dune', 2021)
-    """
-    match = re.search(r"^(.+?)\s*\((\d{4})\)\s*$", title.strip())
-    if match:
-        return match.group(1).strip(), int(match.group(2))
-    return title.strip(), None
 
 
 def _is_retryable_error(error):
@@ -56,24 +43,27 @@ def _execute_with_retry(fn, notify_fn, label, max_retries=3):
 def create_tools(tmdb, radarr, sonarr, bot_instance):
     notify_fn = bot_instance.send_message
 
-    def add_movie_to_library(title: str) -> str:
-        """Searches TMDB for the movie and adds it via Radarr. Use this when the user explicitly wants to download or add a movie."""
+    def add_movie_to_library(title: str, year: int = None) -> str:
+        """Searches TMDB for the movie and adds it via Radarr.
+        Use this when the user explicitly wants to download or add a movie.
+        Pass 'year' when the user specifies a release year or when disambiguating
+        between multiple movies with the same title."""
 
         def action():
-            clean_title, year = _parse_title_and_year(title)
             if year:
-                results = tmdb.search_movie(clean_title, year=year)
+                results = tmdb.search_movie(title, year=year)
                 movies = results.get("results", [])
-                # Tag results with media_type so downstream logic stays consistent
                 for m in movies:
                     m.setdefault("media_type", "movie")
             else:
-                results = tmdb.search_multi(clean_title)
+                results = tmdb.search_multi(title)
                 movies = [
                     r for r in results.get("results", []) if r.get("media_type") == "movie"
                 ]
             if not movies:
-                return f"Could not find any movie matching '{title}'."
+                return f"Could not find any movie matching '{title}'" + (
+                    f" ({year})" if year else ""
+                ) + "."
             if len(movies) > 1:
                 candidates = []
                 for movie in movies[:3]:
@@ -104,23 +94,27 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
 
         return _execute_with_retry(action, notify_fn, f"adding movie '{title}'")
 
-    def add_series_to_library(title: str) -> str:
-        """Searches TMDB for the series and adds it via Sonarr. Use this when the user explicitly wants to download or add a TV show/series."""
+    def add_series_to_library(title: str, year: int = None) -> str:
+        """Searches TMDB for the series and adds it via Sonarr.
+        Use this when the user explicitly wants to download or add a TV show/series.
+        Pass 'year' when the user specifies a premiere year or when disambiguating
+        between multiple shows with the same title."""
 
         def action():
-            clean_title, year = _parse_title_and_year(title)
             if year:
-                results = tmdb.search_tv(clean_title, year=year)
+                results = tmdb.search_tv(title, year=year)
                 series = results.get("results", [])
                 for s in series:
                     s.setdefault("media_type", "tv")
             else:
-                results = tmdb.search_multi(clean_title)
+                results = tmdb.search_multi(title)
                 series = [
                     r for r in results.get("results", []) if r.get("media_type") == "tv"
                 ]
             if not series:
-                return f"Could not find any TV series matching '{title}'."
+                return f"Could not find any TV series matching '{title}'" + (
+                    f" ({year})" if year else ""
+                ) + "."
             if len(series) > 1:
                 candidates = []
                 for show in series[:3]:
