@@ -50,7 +50,7 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
 2. **Automated / Multi-Container Application Updates**:
    Use the community's `update-apps.sh` script on your **Proxmox Host** to automatically update all managed LXC containers (including Media Curator):
    ```bash
-   bash -c "$(curl -fsSL https://github.com/community-scripts/ProxmoxVE/raw/main/tools/update-apps.sh)"
+   bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-apps.sh)"
    ```
 
 3. **Container Operating System Updates**:
