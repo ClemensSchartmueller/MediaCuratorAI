@@ -649,5 +649,84 @@ class TestAgentTools(unittest.TestCase):
         self.mock_bot._compress_history_action.assert_called_once()
 
 
+class TestYearAwareSearch(unittest.TestCase):
+    def setUp(self):
+        self.mock_tmdb = MagicMock()
+        self.mock_radarr = MagicMock()
+        self.mock_sonarr = MagicMock()
+        self.mock_bot = MagicMock()
+
+        self.tools = create_tools(
+            self.mock_tmdb, self.mock_radarr, self.mock_sonarr, self.mock_bot
+        )
+        self.tools_dict = {t.__name__: t for t in self.tools}
+
+    def test_add_movie_with_year_uses_search_movie(self):
+        """When year is provided, search_movie is called instead of search_multi."""
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_movie.return_value = {
+            "results": [{"id": 10, "title": "Sabrina", "release_date": "1996-01-01"}]
+        }
+
+        res = add_movie("Sabrina", year=1996)
+        self.assertIn("Successfully added movie 'Sabrina'", res)
+        self.mock_tmdb.search_movie.assert_called_once_with("Sabrina", year=1996)
+        self.mock_tmdb.search_multi.assert_not_called()
+
+    def test_add_movie_without_year_uses_search_multi(self):
+        """Without a year, the original search_multi path is used."""
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_multi.return_value = {
+            "results": [{"media_type": "movie", "id": 10, "title": "Sabrina"}]
+        }
+
+        res = add_movie("Sabrina")
+        self.assertIn("Successfully added movie 'Sabrina'", res)
+        self.mock_tmdb.search_multi.assert_called_once_with("Sabrina")
+        self.mock_tmdb.search_movie.assert_not_called()
+
+    def test_add_series_with_year_uses_search_tv(self):
+        """When year is provided, search_tv is called instead of search_multi."""
+        add_series = self.tools_dict["add_series_to_library"]
+        self.mock_tmdb.search_tv.return_value = {
+            "results": [{"id": 20, "name": "Shogun", "first_air_date": "1980-09-15"}]
+        }
+
+        res = add_series("Shogun", year=1980)
+        self.assertIn("Successfully added series 'Shogun'", res)
+        self.mock_tmdb.search_tv.assert_called_once_with("Shogun", year=1980)
+        self.mock_tmdb.search_multi.assert_not_called()
+
+    def test_add_series_without_year_uses_search_multi(self):
+        """Without a year, the original search_multi path is used."""
+        add_series = self.tools_dict["add_series_to_library"]
+        self.mock_tmdb.search_multi.return_value = {
+            "results": [{"media_type": "tv", "id": 20, "name": "Shogun"}]
+        }
+
+        res = add_series("Shogun")
+        self.assertIn("Successfully added series 'Shogun'", res)
+        self.mock_tmdb.search_multi.assert_called_once_with("Shogun")
+        self.mock_tmdb.search_tv.assert_not_called()
+
+    def test_add_movie_with_year_not_found(self):
+        """Not-found message includes the year for clarity."""
+        add_movie = self.tools_dict["add_movie_to_library"]
+        self.mock_tmdb.search_movie.return_value = {"results": []}
+
+        res = add_movie("Ghost", year=2026)
+        self.assertIn("Could not find any movie matching 'Ghost' (2026)", res)
+        self.mock_radarr.add_movie.assert_not_called()
+
+    def test_add_series_with_year_not_found(self):
+        """Not-found message includes the year for clarity."""
+        add_series = self.tools_dict["add_series_to_library"]
+        self.mock_tmdb.search_tv.return_value = {"results": []}
+
+        res = add_series("Ghost", year=2026)
+        self.assertIn("Could not find any TV series matching 'Ghost' (2026)", res)
+        self.mock_sonarr.add_series.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

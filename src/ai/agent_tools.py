@@ -43,16 +43,27 @@ def _execute_with_retry(fn, notify_fn, label, max_retries=3):
 def create_tools(tmdb, radarr, sonarr, bot_instance):
     notify_fn = bot_instance.send_message
 
-    def add_movie_to_library(title: str) -> str:
-        """Searches TMDB for the movie and adds it via Radarr. Use this when the user explicitly wants to download or add a movie."""
+    def add_movie_to_library(title: str, year: int = None) -> str:
+        """Searches TMDB for the movie and adds it via Radarr.
+        Use this when the user explicitly wants to download or add a movie.
+        Pass 'year' when the user specifies a release year or when disambiguating
+        between multiple movies with the same title."""
 
         def action():
-            results = tmdb.search_multi(title)
-            movies = [
-                r for r in results.get("results", []) if r.get("media_type") == "movie"
-            ]
+            if year:
+                results = tmdb.search_movie(title, year=year)
+                movies = results.get("results", [])
+                for m in movies:
+                    m.setdefault("media_type", "movie")
+            else:
+                results = tmdb.search_multi(title)
+                movies = [
+                    r for r in results.get("results", []) if r.get("media_type") == "movie"
+                ]
             if not movies:
-                return f"Could not find any movie matching '{title}'."
+                return f"Could not find any movie matching '{title}'" + (
+                    f" ({year})" if year else ""
+                ) + "."
             if len(movies) > 1:
                 candidates = []
                 for movie in movies[:3]:
@@ -83,16 +94,27 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
 
         return _execute_with_retry(action, notify_fn, f"adding movie '{title}'")
 
-    def add_series_to_library(title: str) -> str:
-        """Searches TMDB for the series and adds it via Sonarr. Use this when the user explicitly wants to download or add a TV show/series."""
+    def add_series_to_library(title: str, year: int = None) -> str:
+        """Searches TMDB for the series and adds it via Sonarr.
+        Use this when the user explicitly wants to download or add a TV show/series.
+        Pass 'year' when the user specifies a premiere year or when disambiguating
+        between multiple shows with the same title."""
 
         def action():
-            results = tmdb.search_multi(title)
-            series = [
-                r for r in results.get("results", []) if r.get("media_type") == "tv"
-            ]
+            if year:
+                results = tmdb.search_tv(title, year=year)
+                series = results.get("results", [])
+                for s in series:
+                    s.setdefault("media_type", "tv")
+            else:
+                results = tmdb.search_multi(title)
+                series = [
+                    r for r in results.get("results", []) if r.get("media_type") == "tv"
+                ]
             if not series:
-                return f"Could not find any TV series matching '{title}'."
+                return f"Could not find any TV series matching '{title}'" + (
+                    f" ({year})" if year else ""
+                ) + "."
             if len(series) > 1:
                 candidates = []
                 for show in series[:3]:
