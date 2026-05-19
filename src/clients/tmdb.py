@@ -1,6 +1,7 @@
 from .base import BaseClient
 from datetime import datetime, timedelta
 
+
 class TMDBClient(BaseClient):
     def __init__(self, api_key):
         super().__init__("https://api.themoviedb.org/3", api_key)
@@ -11,12 +12,12 @@ class TMDBClient(BaseClient):
             headers = {}
         if not params:
             params = {}
-            
+
         if self.is_bearer:
             headers["Authorization"] = f"Bearer {self.api_key}"
         else:
             params["api_key"] = self.api_key
-            
+
         # TMDB doesn't use X-Api-Key, so we avoid BaseClient adding it
         # by calling requests directly or passing custom headers to super
         url = f"{self.base_url}{endpoint}"
@@ -28,16 +29,16 @@ class TMDBClient(BaseClient):
         # Movies released to digital/VOD in last 30 days
         today = datetime.now()
         thirty_days_ago = today - timedelta(days=30)
-        
+
         params = {
             "include_adult": False,
             "include_video": False,
             "language": "en-US",
             "page": 1,
             "sort_by": "popularity.desc",
-            "with_release_type": "4|5", # Digital or Physical
+            "with_release_type": "4|5",  # Digital or Physical
             "release_date.gte": thirty_days_ago.strftime("%Y-%m-%d"),
-            "release_date.lte": today.strftime("%Y-%m-%d")
+            "release_date.lte": today.strftime("%Y-%m-%d"),
         }
         return self._get("/discover/movie", params=params)
 
@@ -45,14 +46,14 @@ class TMDBClient(BaseClient):
         # TV shows with first air date in last 30 days
         today = datetime.now()
         thirty_days_ago = today - timedelta(days=30)
-        
+
         params = {
             "include_adult": False,
             "language": "en-US",
             "page": 1,
             "sort_by": "popularity.desc",
             "first_air_date.gte": thirty_days_ago.strftime("%Y-%m-%d"),
-            "first_air_date.lte": today.strftime("%Y-%m-%d")
+            "first_air_date.lte": today.strftime("%Y-%m-%d"),
         }
         return self._get("/discover/tv", params=params)
 
@@ -74,9 +75,7 @@ class TMDBClient(BaseClient):
 
     def discover_by_genre(self, genre_id, media_type):
         """Discovers popular movies or TV shows belonging to a specific genre ID."""
-        return self._get(f"/discover/{media_type}", params={
-            "with_genres": genre_id,
-            "sort_by": "popularity.desc",
-            "page": 1
-        })
-
+        return self._get(
+            f"/discover/{media_type}",
+            params={"with_genres": genre_id, "sort_by": "popularity.desc", "page": 1},
+        )

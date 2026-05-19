@@ -6,7 +6,7 @@ AI-driven media recommendation daemon for self-hosted stacks.
 - **Taste Profiler:** Analyzes Jellyfin history to understand what you like.
 - **Hybrid Discovery:** Finds new VOD/Digital releases on TMDB and filters against your existing library.
 - **AI Curation:** Uses Google Gemini with Google Search grounding to pick the best releases based on your profile.
-- **Interactive Agentic Telegram Integration:** Weekly recommendations are sent via Telegram. Additionally, the bot is a fully conversational AI agent. You can chat with it to:
+- **Interactive Agentic Telegram Integration:** Weekly recommendations and agent responses are formatted beautifully using premium, Telegram-compatible HTML (supporting stylized headers, bulleted lists, code blocks, bold/italics, and links). Powered by a custom Markdown-to-HTML formatter with a bulletproof plain-text fallback. You can chat with the bot to:
   - **Request recommendations on-demand:** "Give me new recommendations" (forces fresh Jellyfin history profiling and TMDB discovery).
   - **Discover by genre:** "What are some good recent comedy movies?" or "Show me scary TV series".
   - **Ask for details:** "Tell me about Interstellar" or "What is the plot of Dune?".

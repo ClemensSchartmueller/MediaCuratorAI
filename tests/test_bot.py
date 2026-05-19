@@ -278,6 +278,110 @@ class TestTelegramBot(unittest.TestCase):
         self.assertEqual(bot.last_interaction_time, 42.5)
         mock_db.set_state.assert_any_call("last_interaction_time", "42.5")
 
+    @patch("src.telegram.bot.GeminiClient")
+    @patch("src.telegram.bot.TMDBClient")
+    @patch("src.telegram.bot.SonarrClient")
+    @patch("src.telegram.bot.RadarrClient")
+    @patch("src.telegram.bot.Database")
+    @patch("src.telegram.bot.telebot")
+    def test_send_message_success_html(
+        self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini
+    ):
+        mock_db = MockDB.return_value
+        mock_db.get_state.return_value = None
+        mock_db.get_chat_history.return_value = []
+
+        bot = TelegramBot()
+        bot.bot = MagicMock()
+        bot.chat_id = "12345"
+
+        bot.send_message("Hello **world**")
+
+        bot.bot.send_message.assert_called_once_with(
+            "12345", "Hello <b>world</b>", parse_mode="HTML"
+        )
+
+    @patch("src.telegram.bot.GeminiClient")
+    @patch("src.telegram.bot.TMDBClient")
+    @patch("src.telegram.bot.SonarrClient")
+    @patch("src.telegram.bot.RadarrClient")
+    @patch("src.telegram.bot.Database")
+    @patch("src.telegram.bot.telebot")
+    def test_send_message_fallback_plain(
+        self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini
+    ):
+        mock_db = MockDB.return_value
+        mock_db.get_state.return_value = None
+        mock_db.get_chat_history.return_value = []
+
+        bot = TelegramBot()
+        bot.bot = MagicMock()
+        bot.chat_id = "12345"
+
+        # Raise exception on HTML call, return success on plain call
+        bot.bot.send_message.side_effect = [Exception("HTML parse error"), MagicMock()]
+
+        bot.send_message("Hello **world**")
+
+        # Should have called it twice: first with HTML mode, then with raw text
+        self.assertEqual(bot.bot.send_message.call_count, 2)
+        bot.bot.send_message.assert_any_call(
+            "12345", "Hello <b>world</b>", parse_mode="HTML"
+        )
+        bot.bot.send_message.assert_any_call("12345", "Hello **world**")
+
+    @patch("src.telegram.bot.GeminiClient")
+    @patch("src.telegram.bot.TMDBClient")
+    @patch("src.telegram.bot.SonarrClient")
+    @patch("src.telegram.bot.RadarrClient")
+    @patch("src.telegram.bot.Database")
+    @patch("src.telegram.bot.telebot")
+    def test_send_reply_success_html(
+        self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini
+    ):
+        mock_db = MockDB.return_value
+        mock_db.get_state.return_value = None
+        mock_db.get_chat_history.return_value = []
+
+        bot = TelegramBot()
+        bot.bot = MagicMock()
+        mock_msg = MagicMock()
+
+        bot.send_reply(mock_msg, "Hello *world*")
+
+        bot.bot.reply_to.assert_called_once_with(
+            mock_msg, "Hello <i>world</i>", parse_mode="HTML"
+        )
+
+    @patch("src.telegram.bot.GeminiClient")
+    @patch("src.telegram.bot.TMDBClient")
+    @patch("src.telegram.bot.SonarrClient")
+    @patch("src.telegram.bot.RadarrClient")
+    @patch("src.telegram.bot.Database")
+    @patch("src.telegram.bot.telebot")
+    def test_send_reply_fallback_plain(
+        self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini
+    ):
+        mock_db = MockDB.return_value
+        mock_db.get_state.return_value = None
+        mock_db.get_chat_history.return_value = []
+
+        bot = TelegramBot()
+        bot.bot = MagicMock()
+        mock_msg = MagicMock()
+
+        # Raise exception on HTML call, return success on plain call
+        bot.bot.reply_to.side_effect = [Exception("HTML parse error"), MagicMock()]
+
+        bot.send_reply(mock_msg, "Hello *world*")
+
+        # Should have called it twice: first with HTML mode, then with raw text
+        self.assertEqual(bot.bot.reply_to.call_count, 2)
+        bot.bot.reply_to.assert_any_call(
+            mock_msg, "Hello <i>world</i>", parse_mode="HTML"
+        )
+        bot.bot.reply_to.assert_any_call(mock_msg, "Hello *world*")
+
 
 class TestAgentTools(unittest.TestCase):
     def setUp(self):

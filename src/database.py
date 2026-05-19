@@ -1,6 +1,7 @@
 import sqlite3
 from src.config import Config
 
+
 class Database:
     def __init__(self, db_path=Config.DB_PATH):
         self.db_path = db_path
@@ -20,7 +21,7 @@ class Database:
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # Table for weekly recommendations mapping
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS active_recommendations (
@@ -65,7 +66,10 @@ class Database:
     def save_taste_profile(self, profile_text):
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO taste_profile (id, profile_text, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP)", (profile_text,))
+            cursor.execute(
+                "INSERT OR REPLACE INTO taste_profile (id, profile_text, updated_at) VALUES (1, ?, CURRENT_TIMESTAMP)",
+                (profile_text,),
+            )
             conn.commit()
 
     def get_taste_profile(self):
@@ -81,22 +85,31 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM active_recommendations")
             for rec in recommendations:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO active_recommendations (tmdb_id, title, media_type, position)
                     VALUES (?, ?, ?, ?)
-                """, (rec['tmdb_id'], rec['title'], rec['media_type'], rec['position']))
+                """,
+                    (rec["tmdb_id"], rec["title"], rec["media_type"], rec["position"]),
+                )
             conn.commit()
 
     def get_recommendation_by_position(self, position):
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT tmdb_id, title, media_type FROM active_recommendations WHERE position = ?", (position,))
+            cursor.execute(
+                "SELECT tmdb_id, title, media_type FROM active_recommendations WHERE position = ?",
+                (position,),
+            )
             return cursor.fetchone()
 
     def get_recommendation_by_title_fragment(self, fragment):
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT tmdb_id, title, media_type FROM active_recommendations WHERE title LIKE ?", (f"%{fragment}%",))
+            cursor.execute(
+                "SELECT tmdb_id, title, media_type FROM active_recommendations WHERE title LIKE ?",
+                (f"%{fragment}%",),
+            )
             return cursor.fetchone()
 
     def save_chat_history(self, history):
@@ -105,10 +118,13 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM chat_history")
             for turn in history:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO chat_history (role, text)
                     VALUES (?, ?)
-                """, (turn['role'], turn['text']))
+                """,
+                    (turn["role"], turn["text"]),
+                )
             conn.commit()
 
     def get_chat_history(self):
@@ -127,10 +143,13 @@ class Database:
     def set_state(self, key, value):
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO chat_state (key, value, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
-            """, (key, value))
+            """,
+                (key, value),
+            )
             conn.commit()
 
     def get_state(self, key):
@@ -139,4 +158,3 @@ class Database:
             cursor.execute("SELECT value FROM chat_state WHERE key = ?", (key,))
             row = cursor.fetchone()
             return row[0] if row else None
-

@@ -3,8 +3,9 @@ from unittest.mock import patch, MagicMock
 from src.clients.tmdb import TMDBClient
 from src.ai.gemini import GeminiClient
 
+
 class TestTMDBClient(unittest.TestCase):
-    @patch('src.clients.base.requests.Session')
+    @patch("src.clients.base.requests.Session")
     def setUp(self, MockSession):
         self.mock_session = MockSession.return_value
         self.client = TMDBClient("mock-api-key")
@@ -21,7 +22,7 @@ class TestTMDBClient(unittest.TestCase):
         self.mock_session.get.assert_called_once()
         args, kwargs = self.mock_session.get.call_args
         self.assertIn("/search/multi", args[0])
-        self.assertEqual(kwargs['params']['query'], "Dune")
+        self.assertEqual(kwargs["params"]["query"], "Dune")
 
     def test_get_movie_details(self):
         mock_response = MagicMock()
@@ -62,31 +63,32 @@ class TestTMDBClient(unittest.TestCase):
         self.assertEqual(res, {"results": []})
         args, kwargs = self.mock_session.get.call_args
         self.assertIn("/discover/movie", args[0])
-        self.assertEqual(kwargs['params']['with_genres'], 28)
+        self.assertEqual(kwargs["params"]["with_genres"], 28)
 
 
 class TestGeminiClientChat(unittest.TestCase):
-    @patch('src.ai.gemini.genai.Client')
+    @patch("src.ai.gemini.genai.Client")
     def test_create_chat_session(self, MockClient):
         mock_genai_client = MockClient.return_value
         client = GeminiClient("mock-api-key")
         client.client = mock_genai_client
-        
+
         mock_chats = MagicMock()
         mock_genai_client.chats = mock_chats
-        
+
         def mock_tool():
             """Mock tool description."""
             pass
-            
+
         client.create_chat_session(tools=[mock_tool], system_instruction="Hello")
-        
+
         mock_chats.create.assert_called_once()
         args, kwargs = mock_chats.create.call_args
-        self.assertEqual(kwargs['model'], 'gemini-flash-latest')
-        self.assertIsNotNone(kwargs['config'])
-        self.assertEqual(kwargs['config'].tools, [mock_tool])
-        self.assertEqual(kwargs['config'].system_instruction, "Hello")
+        self.assertEqual(kwargs["model"], "gemini-flash-latest")
+        self.assertIsNotNone(kwargs["config"])
+        self.assertEqual(kwargs["config"].tools, [mock_tool])
+        self.assertEqual(kwargs["config"].system_instruction, "Hello")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Config:
     JELLYFIN_URL = os.getenv("JELLYFIN_URL")
     JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
