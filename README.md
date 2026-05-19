@@ -59,6 +59,21 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
    bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-lxcs.sh)"
    ```
 
+4. **Updating Private Installations from the Proxmox Host**:
+   If the repository is private and was installed/cloned using `gh` (GitHub CLI), you can authenticate and run the update from your Proxmox Host:
+   - **Step 1:** Authenticate the container's GitHub CLI using your host's active token:
+     ```bash
+     pct exec <CTID> -- bash -c "echo '\$(gh auth token)' | gh auth login --with-token"
+     ```
+   - **Step 2:** Link the Git credential helper to the GitHub CLI inside the container:
+     ```bash
+     pct exec <CTID> -- gh auth setup-git
+     ```
+   - **Step 3:** Trigger the update:
+     ```bash
+     pct exec <CTID> -- update
+     ```
+
 ---
 
 ## Manual Setup (LXC or Linux)
