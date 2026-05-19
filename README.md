@@ -6,7 +6,7 @@ AI-driven media recommendation daemon for self-hosted stacks.
 - **Taste Profiler:** Analyzes Jellyfin history to understand what you like.
 - **Hybrid Discovery:** Finds new VOD/Digital releases on TMDB and filters against your existing library.
 - **AI Curation:** Uses Google Gemini with Google Search grounding to pick the best releases based on your profile.
-- **Interactive Agentic Telegram Integration:** Weekly recommendations are sent via Telegram. Additionally, the bot is a fully conversational AI agent. You can chat with it to:
+- **Interactive Agentic Telegram Integration:** Weekly recommendations and agent responses are formatted beautifully using premium, Telegram-compatible HTML (supporting stylized headers, bulleted lists, code blocks, bold/italics, and links). Powered by a custom Markdown-to-HTML formatter with a bulletproof plain-text fallback. You can chat with the bot to:
   - **Request recommendations on-demand:** "Give me new recommendations" (forces fresh Jellyfin history profiling and TMDB discovery).
   - **Discover by genre:** "What are some good recent comedy movies?" or "Show me scary TV series".
   - **Ask for details:** "Tell me about Interstellar" or "What is the plot of Dune?".
@@ -50,7 +50,7 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
 2. **Automated / Multi-Container Application Updates**:
    Use the community's `update-apps.sh` script on your **Proxmox Host** to automatically update all managed LXC containers (including Media Curator):
    ```bash
-   bash -c "$(curl -fsSL https://github.com/community-scripts/ProxmoxVE/raw/main/tools/update-apps.sh)"
+   bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-apps.sh)"
    ```
 
 3. **Container Operating System Updates**:
@@ -58,6 +58,21 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
    ```bash
    bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-lxcs.sh)"
    ```
+
+4. **Updating Private Installations from the Proxmox Host**:
+   If the repository is private and was installed/cloned using `gh` (GitHub CLI), you can authenticate and run the update from your Proxmox Host:
+   - **Step 1:** Authenticate the container's GitHub CLI using your host's active token:
+     ```bash
+     pct exec <CTID> -- bash -c "echo '\$(gh auth token)' | gh auth login --with-token"
+     ```
+   - **Step 2:** Link the Git credential helper to the GitHub CLI inside the container:
+     ```bash
+     pct exec <CTID> -- gh auth setup-git
+     ```
+   - **Step 3:** Trigger the update:
+     ```bash
+     pct exec <CTID> -- update
+     ```
 
 ---
 

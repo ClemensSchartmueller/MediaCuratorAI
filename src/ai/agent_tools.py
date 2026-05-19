@@ -206,11 +206,11 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
             db = Database()
             db.set_active_recommendations(recs)
 
-            message = "🎬 Fresh Media Recommendations Generated! 🎬\n\n"
+            message = "# Fresh Media Recommendations Generated\n\n"
             for rec in recs:
                 icon = "🎥" if rec["media_type"] == "movie" else "📺"
-                message += f"{rec['position']}. {icon} {rec['title']}\n"
-                message += f"   Why: {rec['justification']}\n\n"
+                message += f"**{rec['position']}. {icon} {rec['title']}**\n"
+                message += f"Why: *{rec['justification']}*\n\n"
             message += (
                 "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
             )

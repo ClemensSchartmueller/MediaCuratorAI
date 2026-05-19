@@ -2,17 +2,16 @@ from google import genai
 from google.genai import types
 from src.config import Config
 
+
 class GeminiClient:
     def __init__(self, api_key=Config.GEMINI_API_KEY):
         self.client = genai.Client(api_key=api_key)
-        self.model_id = 'gemini-flash-latest'
+        self.model_id = "gemini-flash-latest"
 
     def generate_content(self, prompt, config=None):
         """Wrapper for simple content generation used by the Telegram bot."""
         return self.client.models.generate_content(
-            model=self.model_id,
-            contents=prompt,
-            config=config
+            model=self.model_id, contents=prompt, config=config
         )
 
     def generate_taste_profile(self, watch_history_summary):
@@ -51,7 +50,7 @@ class GeminiClient:
             prompt,
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())]
-            )
+            ),
         )
         return response.text.strip()
 
@@ -59,22 +58,22 @@ class GeminiClient:
         """Creates a stateful conversational chat session with auto-function calling enabled."""
         config_kwargs = {}
         if tools:
-            config_kwargs['tools'] = tools
+            config_kwargs["tools"] = tools
         if system_instruction:
-            config_kwargs['system_instruction'] = system_instruction
-            
+            config_kwargs["system_instruction"] = system_instruction
+
         config = types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
-        
+
         contents = []
         if history:
             for turn in history:
                 contents.append(
                     types.Content(
-                        role=turn['role'],
-                        parts=[types.Part.from_text(text=turn['text'])]
+                        role=turn["role"],
+                        parts=[types.Part.from_text(text=turn["text"])],
                     )
                 )
-                
-        return self.client.chats.create(model=self.model_id, config=config, history=contents)
 
-
+        return self.client.chats.create(
+            model=self.model_id, config=config, history=contents
+        )

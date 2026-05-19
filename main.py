@@ -6,6 +6,7 @@ from src.telegram.bot import TelegramBot
 from src.database import Database
 import json
 import re
+from src.telegram.formatter import format_markdown_for_telegram
 
 def main():
     # Reconfigure stdout/stderr to UTF-8 to support printing emojis on all platforms
@@ -35,18 +36,18 @@ def main():
             db = Database()
             db.set_active_recommendations(recs)
             
-            # Format message for Telegram
-            message = "🎬 Weekly Media Recommendations 🎬\n\n"
+            # Format message for Telegram with Markdown styling
+            message = "# Weekly Media Recommendations\n\n"
             for rec in recs:
                 icon = "🎥" if rec['media_type'] == "movie" else "📺"
-                message += f"{rec['position']}. {icon} {rec['title']}\n"
-                message += f"   Why: {rec['justification']}\n\n"
+                message += f"**{rec['position']}. {icon} {rec['title']}**\n"
+                message += f"Why: *{rec['justification']}*\n\n"
             
             message += "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
             
             if args.no_telegram:
                 print("\n--- TEST OUTPUT (No Telegram) ---")
-                print(message)
+                print(format_markdown_for_telegram(message))
                 print("-------------------------------\n")
             else:
                 # Send to Telegram

@@ -7,6 +7,7 @@ from src.clients.sonarr import SonarrClient
 from src.clients.tmdb import TMDBClient
 from src.ai.gemini import GeminiClient
 from src.ai.agent_tools import create_tools
+from src.telegram.formatter import format_markdown_for_telegram
 
 
 class TelegramBot:
@@ -29,7 +30,8 @@ class TelegramBot:
             "You have direct access to tools to download movies/series, get media information, "
             "recommend media by genre, and generate weekly recommendation proposals. "
             "Autonomously call the relevant tool when a user makes a request. "
-            "Always be polite, helpful, and concise in your natural language replies."
+            "Always be polite, helpful, and concise in your natural language replies. "
+            "Keep formatting clean and compatible with simple Markdown (use standard bold, italic, lists, links, and code blocks. Avoid tables or complex markdown structures)."
         )
 
         # Instantiate standalone tool list using our factory
@@ -145,12 +147,38 @@ class TelegramBot:
             )
             return {}
         try:
-            res = self.bot.send_message(self.chat_id, text)
+            formatted_text = format_markdown_for_telegram(text)
+            try:
+                res = self.bot.send_message(
+                    self.chat_id, formatted_text, parse_mode="HTML"
+                )
+            except Exception as html_err:
+                print(
+                    f"Failed to send HTML formatted message via Telegram: {html_err}. "
+                    "Falling back to plain text."
+                )
+                res = self.bot.send_message(self.chat_id, text)
             # Return the message dict for mock compatibility in test suite
             return res.json if hasattr(res, "json") else {}
         except Exception as e:
             print(f"Error sending message via Telegram: {e}")
             raise
+
+    def send_reply(self, to_message, text):
+        if not self.bot:
+            return
+        try:
+            formatted_text = format_markdown_for_telegram(text)
+            try:
+                self.bot.reply_to(to_message, formatted_text, parse_mode="HTML")
+            except Exception as html_err:
+                print(
+                    f"Failed to send HTML formatted reply via Telegram: {html_err}. "
+                    "Falling back to plain text."
+                )
+                self.bot.reply_to(to_message, text)
+        except Exception as e:
+            print(f"Error sending reply via Telegram: {e}")
 
     def handle_reply(self, reply_text):
         # Check automatic 24-hour compression
@@ -199,28 +227,19 @@ class TelegramBot:
                 if cleaned_text == "/clear":
                     self._record_interaction()
                     self._clear_history_action()
-                    try:
-                        self.bot.reply_to(
-                            message, "🧹 Chat history completely cleared and reset."
-                        )
-                    except Exception as e:
-                        print(f"Error replying: {e}")
+                    self.send_reply(
+                        message, "🧹 Chat history completely cleared and reset."
+                    )
                     return
                 elif cleaned_text == "/compress":
                     self._record_interaction()
                     summary = self._compress_history_action()
                     reply_msg = f"📦 Chat history compressed successfully!\n\n**Context Summary:**\n{summary}"
-                    try:
-                        self.bot.reply_to(message, reply_msg)
-                    except Exception as e:
-                        print(f"Error replying: {e}")
+                    self.send_reply(message, reply_msg)
                     return
 
                 response_text = self.handle_reply(text)
-                try:
-                    self.bot.reply_to(message, response_text)
-                except Exception as e:
-                    print(f"Error replying to message: {e}")
+                self.send_reply(message, response_text)
 
         # Starts clean polling optimized for LXC environment (low CPU/memory usage, auto-reconnects on drop)
         self.bot.infinity_polling(timeout=20, long_polling_timeout=20)
