@@ -31,6 +31,7 @@ if [[ -n "$GH_TOKEN" ]]; then
     # otherwise it just uses the env var and might skip the login process or warn.
     _TOKEN="$GH_TOKEN"
     (unset GH_TOKEN; echo "$_TOKEN" | gh auth login --with-token)
+    gh auth setup-git
 fi
 
 echo "Cloning Media Curator..."
