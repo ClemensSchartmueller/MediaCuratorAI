@@ -1,6 +1,6 @@
 # Media Curator AI
 
-AI-driven media recommendation daemon and interactive agent for self-hosted stacks (Jellyfin, Radarr, Sonarr).
+**Media Curator AI** is an AI-driven media recommendation daemon and interactive assistant for self-hosted stacks. By seamlessly connecting **Jellyfin**, **Radarr**, **Sonarr**, and **Telegram**, it provides both a **proactive** weekly curation of new releases tailored to your viewing habits and an **interactive** conversational agent to chat with, query, and manage your personal media library on the go.
 
 > [!WARNING]
 > **Disclaimer:** This project is mostly AI-generated. You must manually review the code, scripts, and configuration before deploying or using it in your environment. Use at your own risk.
