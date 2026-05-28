@@ -4,9 +4,8 @@ from src.ai.profiler import Profiler
 from src.ai.discovery import DiscoveryPipeline
 from src.telegram.bot import TelegramBot
 from src.database import Database
-import json
-import re
 from src.telegram.formatter import format_markdown_for_telegram
+
 
 def main():
     # Reconfigure stdout/stderr to UTF-8 to support printing emojis on all platforms
@@ -61,6 +60,7 @@ def main():
         print("Starting Telegram Listener...")
         bot = TelegramBot()
         bot.listen_loop()
+
 
 if __name__ == "__main__":
     main()
