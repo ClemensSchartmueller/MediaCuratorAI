@@ -155,3 +155,7 @@ If you prefer cron instead of systemd:
 - TMDB API Key
 - Google Gemini API Key
 - Telegram Bot Token & Chat ID
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
