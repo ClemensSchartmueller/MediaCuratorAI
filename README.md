@@ -2,6 +2,9 @@
 
 AI-driven media recommendation daemon for self-hosted stacks.
 
+> [!WARNING]
+> **Disclaimer:** This project is mostly AI-generated. You must manually review the code, scripts, and configuration before deploying or using it in your environment. Use at your own risk.
+
 ## Features
 - **Taste Profiler:** Analyzes Jellyfin history to understand what you like.
 - **Hybrid Discovery:** Finds new VOD/Digital releases on TMDB and filters against your existing library.
