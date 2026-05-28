@@ -1,26 +1,111 @@
 # Media Curator AI
 
-AI-driven media recommendation daemon for self-hosted stacks.
+AI-driven media recommendation daemon and interactive agent for self-hosted stacks (Jellyfin, Radarr, Sonarr).
 
 > [!WARNING]
 > **Disclaimer:** This project is mostly AI-generated. You must manually review the code, scripts, and configuration before deploying or using it in your environment. Use at your own risk.
 
-## Features
-- **Taste Profiler:** Analyzes Jellyfin history to understand what you like.
-- **Hybrid Discovery:** Finds new VOD/Digital releases on TMDB and filters against your existing library.
-- **AI Curation:** Uses Google Gemini with Google Search grounding to pick the best releases based on your profile.
-- **Interactive Agentic Telegram Integration:** Weekly recommendations and agent responses are formatted beautifully using premium, Telegram-compatible HTML (supporting stylized headers, bulleted lists, code blocks, bold/italics, and links). Powered by a custom Markdown-to-HTML formatter with a bulletproof plain-text fallback. You can chat with the bot to:
-  - **Request recommendations on-demand:** "Give me new recommendations" (forces fresh Jellyfin history profiling and TMDB discovery).
-  - **Discover by genre:** "What are some good recent comedy movies?" or "Show me scary TV series".
-  - **Ask for details:** "Tell me about Interstellar" or "What is the plot of Dune?".
-  - **Download specific media directly:** "Download Inception" or "Add Breaking Bad to my library".
-- **Resilient API Calls:** Automatic retry logic with real-time status updates posted directly in Telegram if API timeouts or rate limits occur. Includes dynamic root folder and quality profile validation (with fallback to the first available options if misconfigured) and proactive duplicate pre-checks to reduce common "Bad Request" scenarios.
-- **Context History Management:** Smart session tracking avoids expanding Gemini context windows, controls API costs, and survives system restarts:
-  - **Persistent Conversational Memory:** Conversation history, last interaction timestamps, and compressed context summaries are saved in the local SQLite database, ensuring memory survives service or container restarts.
-  - **Automatic 24-Hour Compression:** If you don't message the bot for 24 hours, it automatically compresses the conversation history into a concise context summary.
-  - **Manual Clear/Compress Commands:** Send `/clear` or `/compress` directly in Telegram, or conversationally ask the bot *"please clear my history"* or *"compress our conversation"*, and the agent will execute the tool autonomously.
+---
 
-## Proxmox LXC Installation
+## 📊 System Architecture & Flow
+
+The following diagram illustrates how the components of Media Curator AI interact with external self-hosted services and APIs:
+
+```mermaid
+graph TD
+    User([User]) <-->|Chat & Commands| Telegram[Telegram Bot]
+    Telegram <-->|Context & Tools| Gemini[Google Gemini API]
+    Gemini <-->|Search Grounding| GoogleSearch[Google Search]
+    
+    subgraph Media Curator AI Daemon
+        Listen[main.py listen] <-->|Interactive Agent| Telegram
+        Discover[main.py discover] -->|Curates & Sends| Telegram
+        Profile[main.py profile] -->|Saves Profile| DB[(SQLite Database)]
+        DB <-->|Chat Memory / Recs| Listen
+        DB -->|Retrieve Taste Profile| Discover
+    end
+
+    Jellyfin[(Jellyfin)] -->|Watch History| Profile
+    Jellyfin -->|Existing Library| Discover
+    TMDB[(TMDB API)] -->|New Releases| Discover
+    Radarr[(Radarr)] -->|Library & Add Movie| Discover & Listen
+    Sonarr[(Sonarr)] -->|Library & Add Show| Discover & Listen
+```
+
+---
+
+## ✨ Features
+
+- **Taste Profiler:** Automatically fetches your Jellyfin playback history (last 50 items), analyzes genres, titles, and descriptions, and leverages Google Gemini to build a highly personalized text-based taste profile stored in SQLite.
+- **Hybrid Discovery:** 
+  - Polls TMDB for new digital releases and popular TV shows.
+  - Queries your active Jellyfin, Radarr, and Sonarr libraries to extract already-owned media IDs.
+  - Filters out duplicates so you never get recommended content you already have.
+  - Sends candidate movies and series to Google Gemini, which curates the top suggestions based on your unique taste profile.
+- **Interactive Agentic Telegram Integration:**
+  - **On-Demand Recommendations:** Trigger fresh watch-history profiling and TMDB discovery conversations on demand.
+  - **Conversational Library Management:** Ask the agent to download media directly. It checks if the item is already present and adds it to Radarr or Sonarr using configured root folders and quality profiles.
+  - **Genre Exploration:** Ask questions like *"What are some good recent sci-fi movies?"* or *"Suggest some thriller series"*.
+  - **Detailed Lookups:** Ask details about any film or TV show (e.g., plot summaries, ratings, cast).
+  - **HTML Formatting:** All Telegram interactions use Telegram-compatible HTML formatting (headers, clean lists, and code blocks) with bulletproof plain-text fallback.
+- **Resilient API Handling:** Built-in connection and rate-limit retry logic with exponential backoff. Real-time warnings (such as temporary TMDB rate limits or Radarr/Sonarr connection drops) are sent to Telegram while retrying.
+- **Conversation State & Context Compression:**
+  - Chat history and conversation states are stored locally in SQLite to survive daemon restarts.
+  - Includes **automatic 24-hour compression**: if you do not interact with the bot for 24 hours, the conversation is automatically summarized to save LLM tokens and keep responses fast.
+  - Supports manual context commands `/clear` and `/compress` (which can also be triggered conversationally).
+
+---
+
+## 🛠️ CLI Command Reference
+
+Execute commands through `main.py` using the project's virtual environment:
+
+| Command | Description | Options / Flags |
+| :--- | :--- | :--- |
+| `python main.py profile` | Runs the Taste Profiler to compile your Jellyfin watch history and update the SQLite database. | None |
+| `python main.py discover` | Runs the weekly discovery pipeline (TMDB discovery, duplicate filtering, Gemini curation, SQLite save, and Telegram post). | `--no-telegram`: Print output to terminal instead of sending via Telegram (ideal for testing). |
+| `python main.py listen` | Starts the interactive Telegram bot polling loop to listen for user chat and commands. | None |
+
+---
+
+## ⚙️ Environment Configuration (`.env`)
+
+Copy `.env.example` to `.env` and fill in the following configurations:
+
+| Variable | Description | Default / Example |
+| :--- | :--- | :--- |
+| `JELLYFIN_URL` | Base URL of your Jellyfin server. | `http://192.168.1.100:8096` |
+| `JELLYFIN_API_KEY` | Jellyfin API Token. | `your_jellyfin_api_token` |
+| `JELLYFIN_USER_ID` | Jellyfin User ID (to read watch history). | `your_jellyfin_user_id` |
+| `SONARR_URL` | Base URL of your Sonarr instance. | `http://192.168.1.100:8989` |
+| `SONARR_API_KEY` | Sonarr API Token. | `your_sonarr_api_token` |
+| `SONARR_ROOT_FOLDER` | Destination path for imported series. | `/data/media/tv` |
+| `SONARR_QUALITY_PROFILE` | ID of the quality profile for series. | `1` |
+| `RADARR_URL` | Base URL of your Radarr instance. | `http://192.168.1.100:7878` |
+| `RADARR_API_KEY` | Radarr API Token. | `your_radarr_api_token` |
+| `RADARR_ROOT_FOLDER` | Destination path for imported movies. | `/data/media/movies` |
+| `RADARR_QUALITY_PROFILE` | ID of the quality profile for movies. | `1` |
+| `TMDB_API_KEY` | The Movie Database (TMDB) API Key. | `your_tmdb_api_key` |
+| `GEMINI_API_KEY` | Google Gemini API Key. | `your_gemini_api_key` |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token (from `@BotFather`). | `your_telegram_bot_token` |
+| `TELEGRAM_CHAT_ID` | Your Telegram personal chat ID. | `your_telegram_chat_id` |
+| `DISCOVERY_SCHEDULE` | Systemd schedule expression for discovery. | `Thu 17:00:00` |
+
+---
+
+## 💾 SQLite Database & Persistence
+
+The project initializes an SQLite database (`media_curator.db`) at startup with the following tables:
+
+1. `taste_profile`: Stores your generated taste profile string, updated whenever `main.py profile` runs.
+2. `active_recommendations`: Stores TMDB IDs, titles, and order (positions 1-5) of the latest curated list. This enables short Telegram commands like *"Download #2"*.
+3. `processed_items`: Contains IDs of already-curated or manually added recommendations to prevent duplicate suggestions in future discovery cycles.
+4. `chat_history`: Keeps track of persistent user and model conversational turns.
+5. `chat_state`: Stores key-value configurations, such as `compressed_context` summaries and the `last_interaction_time`.
+
+---
+
+## 📦 Proxmox LXC Installation
 
 If you are running Proxmox VE, you can use the automated installer. Run this command on your **Proxmox host**:
 
@@ -79,20 +164,21 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
 
 ---
 
-## Manual Setup (LXC or Linux)
+## 🔧 Manual Setup (Linux/Unix/Windows)
 
 1. **Clone & Install:**
    ```bash
    # Using git
    git clone https://github.com/ClemensSchartmueller/MediaCuratorAI.git /opt/media-curator
-   
+
    # Or using GitHub CLI
    gh repo clone ClemensSchartmueller/MediaCuratorAI /opt/media-curator
 
-   cd /opt/media-curator
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   cd /opt/media-curator ; python3 -m venv venv
+   # On Linux/macOS
+   source venv/bin/activate ; pip install -r requirements.txt
+   # On Windows
+   .venv\Scripts\activate ; pip install -r requirements.txt
    ```
 
 2. **Configure:**
@@ -106,59 +192,94 @@ The Proxmox LXC setup supports the standard Proxmox VE Helper-Scripts update mec
    5. Put these values in your `.env` file under `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
 
 3. **Database Setup:**
-   The database will be initialized on the first run.
+   The SQLite database is initialized automatically on the first command run.
 
-4. **Initial Profile:**
+4. **Initial Profile Generation:**
+   Create your taste profile by analyzing your Jellyfin library playback history:
    ```bash
    python main.py profile
    ```
 
-5. **Deployment (LXC):**
-   Copy the service files and generate the timer from your `.env` schedule in one step:
+5. **Service Setup & Scheduling (systemd):**
+   Copy the systemd service files and set up automatic discovery:
    ```bash
    cp deployment/media-curator.service /etc/systemd/system/
    cp deployment/media-curator-discovery.service /etc/systemd/system/
+   
    DISCOVERY_SCHEDULE=$(grep -E '^DISCOVERY_SCHEDULE=' .env | cut -d '=' -f2- | tr -d '"')
    DISCOVERY_SCHEDULE="${DISCOVERY_SCHEDULE:-Thu 17:00:00}"
    sed "s|OnCalendar=.*|OnCalendar=${DISCOVERY_SCHEDULE}|" deployment/media-curator-discovery.timer > /etc/systemd/system/media-curator-discovery.timer
+   
    systemctl daemon-reload
    systemctl enable --now media-curator.service
    systemctl enable --now media-curator-discovery.timer
    ```
 
-## Scheduling
+   **Applying a schedule change:**
+   1. Edit `DISCOVERY_SCHEDULE` in `/opt/media-curator/.env`.
+   2. Run `update` inside the container (or `pct exec <CTID> -- update` from the host).
 
-The discovery timer schedule is configured via `DISCOVERY_SCHEDULE` in your `.env` file using systemd's `OnCalendar` format:
+   **Alternative Cron setup:**
+   If you prefer using cron instead of systemd:
+   ```cron
+   # Weekly discovery (Thursdays at 5 PM)
+   0 17 * * 4 cd /opt/media-curator ; ./venv/bin/python main.py discover
 
-```env
-# Run every Thursday at 5 PM
-DISCOVERY_SCHEDULE=Thu 17:00:00
+   # Monthly profile refresh (1st of every month at 2 AM)
+   0 2 1 * * cd /opt/media-curator ; ./venv/bin/python main.py profile
+   ```
 
-# Other examples:
-# DISCOVERY_SCHEDULE=Fri 08:00:00   # Every Friday at 8 AM
-# DISCOVERY_SCHEDULE=weekly          # systemd default (Monday midnight)
+---
+
+## 🧑‍💻 Developer & Contributor Guide
+
+If you are setting up a development environment or running tests, follow these steps:
+
+### Setup & Seeding
+Use the automated developer environment setup script (installs developer requirements and initializes a local SQLite database seeded with authentic dummy watch history/taste profiles):
+```bash
+# Setup the VM/dev environment
+bash setup_jules.sh
 ```
 
-**Applying a schedule change** (LXC Proxmox installation):
-1. Edit `DISCOVERY_SCHEDULE` in `/opt/media-curator/.env`.
-2. Run `update` inside the container (or `pct exec <CTID> -- update` from the host).
+### Makefile Targets
+Common tasks can be executed easily using the `Makefile`:
 
-If you prefer cron instead of systemd:
-```cron
-# Weekly discovery (Thursdays at 5 PM)
-0 17 * * 4 cd /opt/media-curator && ./venv/bin/python main.py discover
+- **Run all unit tests:**
+  ```bash
+  make test
+  ```
+  *(Or execute manually: `python3 -m unittest discover tests`)*
 
-# Monthly profile refresh (1st of every month at 2 AM)
-0 2 1 * * cd /opt/media-curator && ./venv/bin/python main.py profile
-```
+- **Auto-format code:**
+  ```bash
+  make format
+  ```
 
-## Requirements
+- **Run linter:**
+  ```bash
+  make lint
+  ```
+
+- **Run mock pipeline (no Telegram output):**
+  ```bash
+  make run-test-discovery
+  ```
+  *(Or execute manually: `python3 main.py discover --no-telegram`)*
+
+---
+
+## 📋 Requirements
+
 - Python 3.11+
-- Radarr/Sonarr/Jellyfin
+- Radarr & Sonarr
+- Jellyfin Server
 - TMDB API Key
 - Google Gemini API Key
 - Telegram Bot Token & Chat ID
 
-## License
+---
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
