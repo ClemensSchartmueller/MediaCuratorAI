@@ -50,6 +50,23 @@ class TelegramBot:
 
     def _recreate_chat_session(self, history=None):
         instruction = self.base_system_instruction
+
+        # Inject currently active recommendations
+        try:
+            active_recs = self.db.get_all_active_recommendations()
+            if isinstance(active_recs, list) and active_recs:
+                instruction += "\n\nCurrently Active Recommendations (User might refer to these by number/position):\n"
+                for rec in active_recs:
+                    media_type_label = "Movie" if rec["media_type"] == "movie" else "TV Series"
+                    instruction += f"#{rec['position']}: {rec['title']} ({media_type_label})\n"
+                instruction += (
+                    "When the user requests to download, add, or get an item by its number/position "
+                    "(e.g., 'Download #2' or 'add the first one'), you MUST use the "
+                    "'download_active_recommendation' tool with the corresponding position number."
+                )
+        except Exception as e:
+            print(f"Error fetching active recommendations for context injection: {e}")
+
         if self.compressed_context:
             instruction += f"\n\nHere is a summary of the past conversation history for context:\n{self.compressed_context}"
 
@@ -181,6 +198,18 @@ class TelegramBot:
             print(f"Error sending reply via Telegram: {e}")
 
     def handle_reply(self, reply_text):
+        # Check if background processes updated chat history in the DB
+        if self.db.get_state("history_dirty") == "1":
+            try:
+                db_history = self.db.get_chat_history()
+                self._recreate_chat_session(history=db_history)
+                self.db.set_state("history_dirty", "0")
+                # Background jobs may have updated the interaction timestamp too.
+                last_int_str = self.db.get_state("last_interaction_time")
+                self.last_interaction_time = float(last_int_str) if last_int_str else 0.0
+            except Exception as e:
+                print(f"Error syncing background chat history: {e}")
+
         # Check automatic 24-hour compression
         now = time.time()
         if (

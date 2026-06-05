@@ -112,6 +112,23 @@ class Database:
             )
             return cursor.fetchone()
 
+    def get_all_active_recommendations(self):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT tmdb_id, title, media_type, position FROM active_recommendations ORDER BY position ASC"
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "tmdb_id": r[0],
+                    "title": r[1],
+                    "media_type": r[2],
+                    "position": r[3],
+                }
+                for r in rows
+            ]
+
     def save_chat_history(self, history):
         # history is a list of dicts: {'role': 'user'|'model', 'text': '...'}
         with self._get_connection() as conn:
@@ -133,6 +150,18 @@ class Database:
             cursor.execute("SELECT role, text FROM chat_history ORDER BY id ASC")
             rows = cursor.fetchall()
             return [{"role": r[0], "text": r[1]} for r in rows]
+
+    def append_chat_turn(self, role, text):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO chat_history (role, text)
+                VALUES (?, ?)
+            """,
+                (role, text),
+            )
+            conn.commit()
 
     def clear_chat_history(self):
         with self._get_connection() as conn:
