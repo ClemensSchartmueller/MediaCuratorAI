@@ -51,7 +51,7 @@ graph TD
 - **Resilient API Handling:** Built-in connection and rate-limit retry logic with exponential backoff. Real-time warnings (such as temporary TMDB rate limits or Radarr/Sonarr connection drops) are sent to Telegram while retrying.
 - **Conversation State & Context Compression:**
   - Chat history and conversation states are stored locally in SQLite to survive daemon restarts.
-  - Includes **automatic 24-hour compression**: if you do not interact with the bot for 24 hours, the conversation is automatically summarized to save LLM tokens and keep responses fast.
+  - Includes **automatic 24-hour compression**: if you do not interact with the bot for 24 hours, the conversation is automatically summarized to save LLM tokens and keep responses fast. Active recommendations are dynamically injected into the system instructions, ensuring they survive compression or manual `/clear` commands so the agent never forgets them.
   - Supports manual context commands `/clear` and `/compress` (which can also be triggered conversationally).
 
 ---
@@ -98,7 +98,7 @@ Copy `.env.example` to `.env` and fill in the following configurations:
 The project initializes an SQLite database (`media_curator.db`) at startup with the following tables:
 
 1. `taste_profile`: Stores your generated taste profile string, updated whenever `main.py profile` runs.
-2. `active_recommendations`: Stores TMDB IDs, titles, and order (positions 1-5) of the latest curated list. This enables short Telegram commands like *"Download #2"*.
+2. `active_recommendations`: Stores TMDB IDs, titles, and order (positions 1-5) of the latest curated list. This enables short Telegram commands like *"Download #2"*. The active list is dynamically injected into Gemini's system instructions and processed natively via the `download_active_recommendation` tool to prevent context loss.
 3. `processed_items`: Contains IDs of already-curated or manually added recommendations to prevent duplicate suggestions in future discovery cycles.
 4. `chat_history`: Keeps track of persistent user and model conversational turns.
 5. `chat_state`: Stores key-value configurations, such as `compressed_context` summaries and the `last_interaction_time`.

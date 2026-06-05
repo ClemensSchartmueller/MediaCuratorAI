@@ -49,6 +49,16 @@ def main():
                 print(format_markdown_for_telegram(message))
                 print("-------------------------------\n")
             else:
+                # Update last interaction time to reset 24h compaction clock
+                import time
+                db.set_state("last_interaction_time", str(time.time()))
+                
+                # Append recommendation message to persistent chat history
+                history = db.get_chat_history()
+                history.append({"role": "model", "text": message})
+                db.save_chat_history(history)
+                db.set_state("history_dirty", "1")
+
                 # Send to Telegram
                 bot = TelegramBot()
                 bot.send_message(message)

@@ -382,6 +382,40 @@ class TestTelegramBot(unittest.TestCase):
         )
         bot.bot.reply_to.assert_any_call(mock_msg, "Hello *world*")
 
+    @patch("src.telegram.bot.GeminiClient")
+    @patch("src.telegram.bot.TMDBClient")
+    @patch("src.telegram.bot.SonarrClient")
+    @patch("src.telegram.bot.RadarrClient")
+    @patch("src.telegram.bot.Database")
+    @patch("src.telegram.bot.telebot")
+    def test_recreate_chat_session_injects_recommendations(
+        self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini
+    ):
+        mock_db = MockDB.return_value
+        mock_db.get_state.return_value = None
+        mock_db.get_chat_history.return_value = []
+        
+        # Return a list of active recommendations
+        mock_db.get_all_active_recommendations.return_value = [
+            {"position": 1, "title": "Inception", "media_type": "movie"},
+            {"position": 2, "title": "Severance", "media_type": "tv"}
+        ]
+
+        mock_gemini = MockGemini.return_value
+        mock_chat = MagicMock()
+        mock_gemini.create_chat_session.return_value = mock_chat
+
+        bot = TelegramBot()
+        
+        # Verify call arguments
+        args, kwargs = mock_gemini.create_chat_session.call_args
+        system_instruction = kwargs.get("system_instruction", "")
+        
+        self.assertIn("Currently Active Recommendations", system_instruction)
+        self.assertIn("#1: Inception (Movie)", system_instruction)
+        self.assertIn("#2: Severance (TV Series)", system_instruction)
+        self.assertIn("download_active_recommendation", system_instruction)
+
 
 class TestAgentTools(unittest.TestCase):
     def setUp(self):
@@ -647,6 +681,43 @@ class TestAgentTools(unittest.TestCase):
         res = compress_history()
         self.assertEqual(res, "Compressed")
         self.mock_bot._compress_history_action.assert_called_once()
+
+    def test_download_active_recommendation_movie(self):
+        download_rec = self.tools_dict["download_active_recommendation"]
+        self.mock_bot.db.get_recommendation_by_position.return_value = (
+            123,
+            "Inception",
+            "movie",
+        )
+
+        res = download_rec(1)
+        self.assertIn("Successfully added movie 'Inception' to your Radarr library", res)
+        self.mock_radarr.add_movie.assert_called_once_with(
+            123, unittest.mock.ANY, unittest.mock.ANY
+        )
+
+    def test_download_active_recommendation_tv(self):
+        download_rec = self.tools_dict["download_active_recommendation"]
+        self.mock_bot.db.get_recommendation_by_position.return_value = (
+            456,
+            "Severance",
+            "tv",
+        )
+
+        res = download_rec(2)
+        self.assertIn("Successfully added series 'Severance' to your Sonarr library", res)
+        self.mock_sonarr.add_series.assert_called_once_with(
+            456, unittest.mock.ANY, unittest.mock.ANY
+        )
+
+    def test_download_active_recommendation_not_found(self):
+        download_rec = self.tools_dict["download_active_recommendation"]
+        self.mock_bot.db.get_recommendation_by_position.return_value = None
+
+        res = download_rec(3)
+        self.assertIn("No active recommendation found at position 3", res)
+        self.mock_radarr.add_movie.assert_not_called()
+        self.mock_sonarr.add_series.assert_not_called()
 
 
 class TestYearAwareSearch(unittest.TestCase):

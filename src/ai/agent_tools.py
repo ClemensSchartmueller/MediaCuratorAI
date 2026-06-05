@@ -240,6 +240,40 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
 
         return _execute_with_retry(action, notify_fn, "generating fresh proposals")
 
+    def download_active_recommendation(position: int) -> str:
+        """Downloads/adds a movie or series to your library by its position number from the active recommendations list (e.g. 1, 2, 3...).
+        Use this when the user requests to download, add, or get an item by its list number (e.g., 'Download #2' or 'add the first one')."""
+
+        def action():
+            rec = bot_instance.db.get_recommendation_by_position(position)
+            if not rec:
+                return f"No active recommendation found at position {position}."
+            tmdb_id, title, media_type = rec
+            try:
+                if media_type == "movie":
+                    radarr.add_movie(
+                        tmdb_id,
+                        Config.RADARR_ROOT_FOLDER,
+                        Config.RADARR_QUALITY_PROFILE,
+                    )
+                    return f"Successfully added movie '{title}' to your Radarr library!"
+                elif media_type == "tv":
+                    sonarr.add_series(
+                        tmdb_id,
+                        Config.SONARR_ROOT_FOLDER,
+                        Config.SONARR_QUALITY_PROFILE,
+                    )
+                    return f"Successfully added series '{title}' to your Sonarr library!"
+                else:
+                    return f"Unsupported media type '{media_type}' for recommendation at position {position}."
+            except MediaAlreadyExistsError as e:
+                return (
+                    f"The {e.media_kind} '{e.title}' is already in your "
+                    f"{e.library_name} library!"
+                )
+
+        return _execute_with_retry(action, notify_fn, f"downloading recommendation #{position}")
+
     def clear_chat_history() -> str:
         """Completely clears all conversation history and resets the assistant's state. Use this when the user explicitly requests to clear, reset, or wipe their chat history."""
         return bot_instance._clear_history_action()
@@ -254,6 +288,7 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
         get_media_information,
         discover_by_genre,
         generate_new_proposals,
+        download_active_recommendation,
         clear_chat_history,
         compress_chat_history,
     ]
