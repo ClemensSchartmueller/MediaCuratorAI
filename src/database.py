@@ -151,6 +151,18 @@ class Database:
             rows = cursor.fetchall()
             return [{"role": r[0], "text": r[1]} for r in rows]
 
+    def append_chat_turn(self, role, text):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO chat_history (role, text)
+                VALUES (?, ?)
+            """,
+                (role, text),
+            )
+            conn.commit()
+
     def clear_chat_history(self):
         with self._get_connection() as conn:
             cursor = conn.cursor()

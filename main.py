@@ -54,9 +54,7 @@ def main():
                 db.set_state("last_interaction_time", str(time.time()))
                 
                 # Append recommendation message to persistent chat history
-                history = db.get_chat_history()
-                history.append({"role": "model", "text": message})
-                db.save_chat_history(history)
+                db.append_chat_turn("model", message)
                 db.set_state("history_dirty", "1")
 
                 # Send to Telegram

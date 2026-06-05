@@ -204,6 +204,9 @@ class TelegramBot:
                 db_history = self.db.get_chat_history()
                 self._recreate_chat_session(history=db_history)
                 self.db.set_state("history_dirty", "0")
+                # Background jobs may have updated the interaction timestamp too.
+                last_int_str = self.db.get_state("last_interaction_time")
+                self.last_interaction_time = float(last_int_str) if last_int_str else 0.0
             except Exception as e:
                 print(f"Error syncing background chat history: {e}")
 

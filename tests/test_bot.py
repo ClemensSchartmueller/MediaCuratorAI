@@ -416,6 +416,53 @@ class TestTelegramBot(unittest.TestCase):
         self.assertIn("#2: Severance (TV Series)", system_instruction)
         self.assertIn("download_active_recommendation", system_instruction)
 
+    @patch("src.telegram.bot.time.time")
+    @patch("src.telegram.bot.GeminiClient")
+    @patch("src.telegram.bot.TMDBClient")
+    @patch("src.telegram.bot.SonarrClient")
+    @patch("src.telegram.bot.RadarrClient")
+    @patch("src.telegram.bot.Database")
+    @patch("src.telegram.bot.telebot")
+    def test_handle_reply_syncs_dirty_history(
+        self, mock_telebot, MockDB, MockRadarr, MockSonarr, MockTMDB, MockGemini, mock_time
+    ):
+        mock_time.return_value = 300.0
+        mock_db = MockDB.return_value
+        state_dict = {"history_dirty": "0", "last_interaction_time": "100.0"}
+        mock_db.get_state.side_effect = lambda k: state_dict.get(k)
+        mock_db.get_chat_history.return_value = [{"role": "user", "text": "Hi"}]
+
+        mock_gemini = MockGemini.return_value
+        mock_chat = MagicMock()
+        mock_gemini.create_chat_session.return_value = mock_chat
+        
+        mock_response = MagicMock()
+        mock_response.text = "Hello"
+        mock_chat.send_message.return_value = mock_response
+
+        bot = TelegramBot()
+        self.assertEqual(mock_gemini.create_chat_session.call_count, 1)
+
+        # Simulate background changes
+        state_dict["history_dirty"] = "1"
+        state_dict["last_interaction_time"] = "200.0"
+        
+        new_history = [
+            {"role": "user", "text": "Hi"},
+            {"role": "model", "text": "Background Recommendation Message"}
+        ]
+        mock_db.get_chat_history.return_value = new_history
+
+        bot.handle_reply("New reply")
+        
+        self.assertEqual(mock_gemini.create_chat_session.call_count, 2)
+        args, kwargs = mock_gemini.create_chat_session.call_args_list[1]
+        self.assertEqual(kwargs.get("history"), new_history)
+
+        mock_db.set_state.assert_any_call("history_dirty", "0")
+        mock_db.get_state.assert_any_call("last_interaction_time")
+        self.assertEqual(bot.last_interaction_time, 300.0)
+
 
 class TestAgentTools(unittest.TestCase):
     def setUp(self):
