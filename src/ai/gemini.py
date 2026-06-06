@@ -43,6 +43,8 @@ class GeminiClient:
         - "tmdb_id": The exact TMDB ID provided in candidates.
         - "media_type": Either "movie" or "tv".
         - "justification": A one-sentence explanation of why it matches the profile.
+        - "release_info": The release year (e.g., '2024'), or if the release date is in the future compared to the current year, the full release date (e.g., '2025-10-24'). Ensure this is always included.
+        - "rating": The rating value (e.g., 7.8) extracted from the candidate's [Rating: ...] block. If no rating is found or it's 'Unknown', output null or a default rating.
 
         Ensure the output is ONLY the JSON object.
         """

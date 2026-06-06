@@ -58,7 +58,8 @@ class TelegramBot:
                 instruction += "\n\nCurrently Active Recommendations (User might refer to these by number/position):\n"
                 for rec in active_recs:
                     media_type_label = "Movie" if rec["media_type"] == "movie" else "TV Series"
-                    instruction += f"#{rec['position']}: {rec['title']} ({media_type_label})\n"
+                    release_suffix = f" ({rec['release_info']})" if rec.get('release_info') else ""
+                    instruction += f"#{rec['position']}: {rec['title']}{release_suffix} ({media_type_label})\n"
                 instruction += (
                     "When the user requests to download, add, or get an item by its number/position "
                     "(e.g., 'Download #2' or 'add the first one'), you MUST use the "

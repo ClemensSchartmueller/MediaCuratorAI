@@ -66,11 +66,15 @@ class DiscoveryPipeline:
         # 5. Prepare candidates for Gemini
         candidates_text = "Movies:\n"
         for m in candidate_movies[:20]:  # Limit to top 20 popular new releases
-            candidates_text += f"- {m['title']} (TMDB ID: {m['id']}): {m['overview']}\n"
+            release_date = m.get('release_date', 'Unknown')
+            vote_average = m.get('vote_average', 'Unknown')
+            candidates_text += f"- {m['title']} ({release_date}) [Rating: {vote_average}] (TMDB ID: {m['id']}): {m['overview']}\n"
 
         candidates_text += "\nTV Series:\n"
         for t in candidate_tv[:20]:
-            candidates_text += f"- {t['name']} (TMDB ID: {t['id']}): {t['overview']}\n"
+            first_air_date = t.get('first_air_date', 'Unknown')
+            vote_average = t.get('vote_average', 'Unknown')
+            candidates_text += f"- {t['name']} ({first_air_date}) [Rating: {vote_average}] (TMDB ID: {t['id']}): {t['overview']}\n"
 
         # 6. Curate via Gemini
         raw_curation = self.gemini.curate_recommendations(profile, candidates_text)

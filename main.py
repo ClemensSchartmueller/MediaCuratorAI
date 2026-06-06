@@ -4,7 +4,7 @@ from src.ai.profiler import Profiler
 from src.ai.discovery import DiscoveryPipeline
 from src.telegram.bot import TelegramBot
 from src.database import Database
-from src.telegram.formatter import format_markdown_for_telegram
+from src.telegram.formatter import format_markdown_for_telegram, format_recommendations
 
 
 def main():
@@ -36,13 +36,7 @@ def main():
             db.set_active_recommendations(recs)
             
             # Format message for Telegram with Markdown styling
-            message = "# Weekly Media Recommendations\n\n"
-            for rec in recs:
-                icon = "🎥" if rec['media_type'] == "movie" else "📺"
-                message += f"**{rec['position']}. {icon} {rec['title']}**\n"
-                message += f"Why: *{rec['justification']}*\n\n"
-            
-            message += "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
+            message = format_recommendations(recs)
             
             if args.no_telegram:
                 print("\n--- TEST OUTPUT (No Telegram) ---")
