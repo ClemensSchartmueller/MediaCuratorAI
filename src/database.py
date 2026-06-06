@@ -30,9 +30,16 @@ class Database:
                     title TEXT,
                     media_type TEXT, -- 'movie' or 'tv'
                     position INTEGER, -- 1, 2, 3...
+                    release_info TEXT,
                     sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Migration: add release_info if it doesn't exist
+            try:
+                cursor.execute("ALTER TABLE active_recommendations ADD COLUMN release_info TEXT")
+            except sqlite3.OperationalError:
+                pass
 
             # Table for tracking processed items to avoid duplicates
             cursor.execute("""
@@ -80,17 +87,17 @@ class Database:
             return row[0] if row else None
 
     def set_active_recommendations(self, recommendations):
-        # recommendations is a list of dicts: {'tmdb_id': 123, 'title': '...', 'media_type': 'movie', 'position': 1}
+        # recommendations is a list of dicts: {'tmdb_id': 123, 'title': '...', 'media_type': 'movie', 'position': 1, 'release_info': '...'}
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM active_recommendations")
             for rec in recommendations:
                 cursor.execute(
                     """
-                    INSERT INTO active_recommendations (tmdb_id, title, media_type, position)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO active_recommendations (tmdb_id, title, media_type, position, release_info)
+                    VALUES (?, ?, ?, ?, ?)
                 """,
-                    (rec["tmdb_id"], rec["title"], rec["media_type"], rec["position"]),
+                    (rec["tmdb_id"], rec["title"], rec["media_type"], rec["position"], rec.get("release_info")),
                 )
             conn.commit()
 
@@ -116,7 +123,7 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT tmdb_id, title, media_type, position FROM active_recommendations ORDER BY position ASC"
+                "SELECT tmdb_id, title, media_type, position, release_info FROM active_recommendations ORDER BY position ASC"
             )
             rows = cursor.fetchall()
             return [
@@ -125,6 +132,7 @@ class Database:
                     "title": r[1],
                     "media_type": r[2],
                     "position": r[3],
+                    "release_info": r[4],
                 }
                 for r in rows
             ]

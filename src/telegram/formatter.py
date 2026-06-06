@@ -100,3 +100,37 @@ def format_markdown_for_telegram(text: str) -> str:
         escaped_text = escaped_text.replace(placeholder, f"<pre>{code}</pre>")
 
     return escaped_text
+
+
+def format_recommendations(recs: list) -> str:
+    """
+    Formats a list of recommendation dictionaries into a single markdown string
+    suitable for passing to format_markdown_for_telegram.
+    """
+    movies = [r for r in recs if r.get("media_type") == "movie"]
+    tv_shows = [r for r in recs if r.get("media_type") == "tv"]
+
+    message = "# Weekly Media Recommendations\n\n"
+
+    if movies:
+        message += "## Movies\n"
+        for rec in movies:
+            icon = "🎥"
+            release_info = f" ({rec.get('release_info', '')})" if rec.get('release_info') else ""
+            rating_info = f" - ⭐ {rec.get('rating')}/10" if rec.get('rating') else ""
+            tmdb_link = f" [TMDB](https://www.themoviedb.org/movie/{rec.get('tmdb_id')})" if rec.get('tmdb_id') else ""
+            message += f"**{rec['position']}. {icon} {rec['title']}{release_info}**{rating_info}{tmdb_link}\n"
+            message += f"Why: *{rec['justification']}*\n\n"
+
+    if tv_shows:
+        message += "## TV Series\n"
+        for rec in tv_shows:
+            icon = "📺"
+            release_info = f" ({rec.get('release_info', '')})" if rec.get('release_info') else ""
+            rating_info = f" - ⭐ {rec.get('rating')}/10" if rec.get('rating') else ""
+            tmdb_link = f" [TMDB](https://www.themoviedb.org/tv/{rec.get('tmdb_id')})" if rec.get('tmdb_id') else ""
+            message += f"**{rec['position']}. {icon} {rec['title']}{release_info}**{rating_info}{tmdb_link}\n"
+            message += f"Why: *{rec['justification']}*\n\n"
+
+    message += "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
+    return message

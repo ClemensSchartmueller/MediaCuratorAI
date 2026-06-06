@@ -5,6 +5,7 @@ from src.ai.discovery import DiscoveryPipeline
 from src.clients.exceptions import MediaAlreadyExistsError
 from src.database import Database
 from src.config import Config
+from src.telegram.formatter import format_recommendations
 
 
 def _is_retryable_error(error):
@@ -228,14 +229,9 @@ def create_tools(tmdb, radarr, sonarr, bot_instance):
             db = Database()
             db.set_active_recommendations(recs)
 
-            message = "# Fresh Media Recommendations Generated\n\n"
-            for rec in recs:
-                icon = "🎥" if rec["media_type"] == "movie" else "📺"
-                message += f"**{rec['position']}. {icon} {rec['title']}**\n"
-                message += f"Why: *{rec['justification']}*\n\n"
-            message += (
-                "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
-            )
+            message = format_recommendations(recs)
+            # Replace the generic header if needed to match the tool output expectation
+            message = message.replace("# Weekly Media Recommendations", "# Fresh Media Recommendations Generated")
             return message
 
         return _execute_with_retry(action, notify_fn, "generating fresh proposals")

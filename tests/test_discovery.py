@@ -37,7 +37,7 @@ class TestDiscoveryPipeline(unittest.TestCase):
         }
 
         mock_gemini = MockGemini.return_value
-        mock_gemini.curate_recommendations.return_value = '{"recommendations": [{"title": "New Movie", "tmdb_id": 4, "media_type": "movie", "justification": "Because action."}]}'
+        mock_gemini.curate_recommendations.return_value = '{"recommendations": [{"title": "New Movie", "tmdb_id": 4, "media_type": "movie", "justification": "Because action.", "release_info": "2026", "rating": 8.0}]}'
 
         # Run
         pipeline = DiscoveryPipeline()
@@ -48,6 +48,8 @@ class TestDiscoveryPipeline(unittest.TestCase):
         self.assertEqual(recs[0]["title"], "New Movie")
         self.assertEqual(recs[0]["position"], 1)
         self.assertEqual(recs[0]["justification"], "Because action.")
+        self.assertEqual(recs[0]["release_info"], "2026")
+        self.assertEqual(recs[0]["rating"], 8.0)
 
     @patch("src.ai.discovery.Database")
     @patch("src.ai.discovery.GeminiClient")

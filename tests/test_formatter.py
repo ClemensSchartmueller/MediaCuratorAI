@@ -1,8 +1,37 @@
 import unittest
-from src.telegram.formatter import format_markdown_for_telegram
+from src.telegram.formatter import format_markdown_for_telegram, format_recommendations
 
 
 class TestTelegramFormatter(unittest.TestCase):
+    def test_format_recommendations(self):
+        recs = [
+            {
+                "position": 1,
+                "media_type": "movie",
+                "title": "Movie Title",
+                "release_info": "2024",
+                "rating": 8.5,
+                "tmdb_id": 101,
+                "justification": "This is a movie."
+            },
+            {
+                "position": 2,
+                "media_type": "tv",
+                "title": "TV Show Title",
+                "release_info": "2025-05-12",
+                "rating": None,
+                "tmdb_id": 202,
+                "justification": "This is a TV show."
+            }
+        ]
+        result = format_recommendations(recs)
+        self.assertIn("# Weekly Media Recommendations", result)
+        self.assertIn("## Movies", result)
+        self.assertIn("**1. 🎥 Movie Title (2024)** - ⭐ 8.5/10 [TMDB](https://www.themoviedb.org/movie/101)", result)
+        self.assertIn("## TV Series", result)
+        self.assertIn("**2. 📺 TV Show Title (2025-05-12)** [TMDB](https://www.themoviedb.org/tv/202)", result)
+        self.assertNotIn("- ⭐ None/10", result)
+
     def test_plain_text(self):
         self.assertEqual(format_markdown_for_telegram("Hello world"), "Hello world")
         self.assertEqual(format_markdown_for_telegram(""), "")
