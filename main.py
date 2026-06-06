@@ -39,7 +39,8 @@ def main():
             message = "# Weekly Media Recommendations\n\n"
             for rec in recs:
                 icon = "🎥" if rec['media_type'] == "movie" else "📺"
-                message += f"**{rec['position']}. {icon} {rec['title']}**\n"
+                release_info = f" ({rec.get('release_info', '')})" if rec.get('release_info') else ""
+                message += f"**{rec['position']}. {icon} {rec['title']}{release_info}**\n"
                 message += f"Why: *{rec['justification']}*\n\n"
             
             message += "Reply with 'Add [Title]' or 'Download #1' to add to your library!"
